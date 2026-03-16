@@ -1,0 +1,10 @@
+[
+    { "src": "assets/images/photo1.png", "title": "Urban Minimalism", "category": "Portrait Photography" },
+    { "src": "assets/images/photo2.png", "title": "Emerald Whisper", "category": "Nature Photography" },
+    { "src": "assets/images/photo3.png", "title": "Crystal Geometric", "category": "Architectural Photography" },
+    { "src": "assets/images/photo4.png", "title": "Highland Mist", "category": "Landscape Photography" },
+    { "src": "assets/images/photo5.png", "title": "Concrete Echoes", "category": "Architectural Photography" },
+    { "src": "assets/images/photo6.png", "title": "Golden Reflection", "category": "Macro Photography" },
+    { "src": "assets/images/photo7.png", "title": "Sand & Silk", "category": "Portrait Photography" },
+    { "src": "assets/images/photo8.png", "title": "Celestial Mirror", "category": "Astro Photography" }
+]

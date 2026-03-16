@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photography Portfolio | Capturing Moments</title>
+    <meta name="description" content="A premium photography portfolio showcasing professional landscape, portrait, and architectural photography.">
+    <link rel="stylesheet" href="index.css">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yourportfolio.com/">
+    <meta property="og:title" content="Photography Portfolio | Capturing Moments">
+    <meta property="og:description" content="A premium photography portfolio showcasing professional landscape, portrait, and architectural photography.">
+    <meta property="og:image" content="assets/images/photo1.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://yourportfolio.com/">
+    <meta property="twitter:title" content="Photography Portfolio | Capturing Moments">
+    <meta property="twitter:description" content="A premium photography portfolio showcasing professional landscape, portrait, and architectural photography.">
+    <meta property="twitter:image" content="assets/images/photo1.png">
+</head>
+<body>
+    <nav>
+        <div class="logo">FOCUS.</div>
+        <div class="mobile-menu-btn" onclick="toggleMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="nav-links">
+            <a href="#home">Home</a>
+            <a href="#gallery">Gallery</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </div>
+    </nav>
+
+    <header id="home" class="hero">
+        <div class="hero-content">
+            <h1>Visual Journeys</h1>
+            <p>Exploring the world through a lens, capturing the quiet moments that tell a thousand stories.</p>
+            <a href="#gallery" class="cta-button">Explore Work</a>
+        </div>
+    </header>
+
+    <main>
+        <section id="gallery" class="gallery-section">
+            <div class="section-header">
+                <h2>The Collection</h2>
+                <p>A curated selection of my favorite shots.</p>
+            </div>
+            <div class="gallery-grid">
+                <!-- Dynamically populated by main.js -->
+            </div>
+        </section>
+    </main>
+
+    <div id="lightbox" onclick="closeLightbox()">
+        <span class="close-lightbox">&times;</span>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

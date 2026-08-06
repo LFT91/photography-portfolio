@@ -23,6 +23,12 @@ export type PendingUpload = {
   displayScale: number;
 };
 
+export type PendingReplace = {
+  photoId: string;
+  file: File;
+  previewUrl: string;
+};
+
 type PhotoPatch = {
   title?: string;
   displayScale?: number;
@@ -34,19 +40,23 @@ export type EditDraft = {
   /** Category / room key → ordered photo ids (server + pending localIds). */
   orders: Record<string, string[]>;
   uploads: PendingUpload[];
+  /** Existing photo id → staged replacement file. */
+  replaces: Record<string, PendingReplace>;
 };
 
 const emptyDraft = (): EditDraft => ({
   patches: {},
   orders: {},
   uploads: [],
+  replaces: {},
 });
 
 function draftIsDirty(draft: EditDraft) {
   return (
     draft.uploads.length > 0 ||
     Object.keys(draft.orders).length > 0 ||
-    Object.keys(draft.patches).length > 0
+    Object.keys(draft.patches).length > 0 ||
+    Object.keys(draft.replaces).length > 0
   );
 }
 
@@ -65,17 +75,18 @@ export function applyDraftToList(
       return !draft.patches[p.id]?.deleted;
     })
     .map((p) => {
+      const replace = p.id ? draft.replaces[p.id] : undefined;
       if (!p.id) {
         return { ...p, displayScale: clampScale(p.displayScale ?? 1) };
       }
       const patch = draft.patches[p.id];
-      if (!patch) {
-        return { ...p, displayScale: clampScale(p.displayScale ?? 1) };
-      }
       return {
         ...p,
-        title: patch.title ?? p.title,
-        displayScale: clampScale(patch.displayScale ?? p.displayScale ?? 1),
+        src: replace?.previewUrl ?? p.src,
+        title: patch?.title ?? p.title,
+        displayScale: clampScale(
+          patch?.displayScale ?? p.displayScale ?? 1,
+        ),
       };
     });
 
@@ -139,6 +150,7 @@ type AdminContextValue = {
   markDeleted: (photo: Photo) => void;
   setViewOrder: (viewKey: PhotoCategory, ordered: Photo[]) => void;
   queueUpload: (file: File, categories: PhotoCategory[]) => string | null;
+  queueReplace: (photo: Photo, file: File) => string | null;
   refresh: () => void;
 };
 
@@ -146,6 +158,10 @@ const AdminContext = createContext<AdminContextValue | null>(null);
 
 function revokeUploads(uploads: PendingUpload[]) {
   for (const u of uploads) URL.revokeObjectURL(u.previewUrl);
+}
+
+function revokeReplaces(replaces: Record<string, PendingReplace>) {
+  for (const r of Object.values(replaces)) URL.revokeObjectURL(r.previewUrl);
 }
 
 export function AdminProvider({ children }: { children: ReactNode }) {
@@ -210,6 +226,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const discardDraft = useCallback(() => {
     setDraft((prev) => {
       revokeUploads(prev.uploads);
+      revokeReplaces(prev.replaces);
       return emptyDraft();
     });
     setSaveError(null);
@@ -361,6 +378,37 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const queueReplace = useCallback((photo: Photo, file: File) => {
+    if (!photo.id) return "Missing photo id.";
+    if (!file.type.startsWith("image/")) return "Please choose an image file.";
+    const previewUrl = URL.createObjectURL(file);
+
+    if (photo.id.startsWith("pending:")) {
+      setDraft((d) => ({
+        ...d,
+        uploads: d.uploads.map((u) => {
+          if (u.localId !== photo.id) return u;
+          URL.revokeObjectURL(u.previewUrl);
+          return { ...u, file, previewUrl };
+        }),
+      }));
+      return null;
+    }
+
+    setDraft((d) => {
+      const prev = d.replaces[photo.id!];
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return {
+        ...d,
+        replaces: {
+          ...d.replaces,
+          [photo.id!]: { photoId: photo.id!, file, previewUrl },
+        },
+      };
+    });
+    return null;
+  }, []);
+
   const saveDraft = useCallback(async () => {
     if (!supabase || !user) return "Not signed in.";
     setSaving(true);
@@ -423,7 +471,43 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (error) throw new Error(error.message);
       }
 
-      // 3. Title / scale patches
+      // 3. File replacements (keep same row / title / order)
+      for (const replace of Object.values(current.replaces)) {
+        if (current.patches[replace.photoId]?.deleted) continue;
+
+        const { data: row } = await supabase
+          .from("photos")
+          .select("storage_path")
+          .eq("id", replace.photoId)
+          .maybeSingle();
+
+        const ext = replace.file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("photos")
+          .upload(path, replace.file, { cacheControl: "3600", upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("photos").getPublicUrl(path);
+
+        const { error: updateError } = await supabase
+          .from("photos")
+          .update({
+            storage_path: path,
+            public_url: publicUrl,
+          })
+          .eq("id", replace.photoId);
+        if (updateError) throw new Error(updateError.message);
+
+        if (row?.storage_path && !row.storage_path.startsWith("images/")) {
+          await supabase.storage.from("photos").remove([row.storage_path]);
+        }
+      }
+
+      // 4. Title / scale patches
       for (const [id, patch] of Object.entries(current.patches)) {
         if (patch.deleted) continue;
         const update: Record<string, unknown> = {};
@@ -437,7 +521,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (error) throw new Error(error.message);
       }
 
-      // 4. Reorders — resolve pending ids, permute existing sort_order values
+      // 5. Reorders — resolve pending ids, permute existing sort_order values
       for (const ids of Object.values(current.orders)) {
         const resolved = ids
           .map((id) => (id.startsWith("pending:") ? idMap.get(id) : id))
@@ -468,6 +552,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       }
 
       revokeUploads(current.uploads);
+      revokeReplaces(current.replaces);
       setDraft(emptyDraft());
       refresh();
       return null;
@@ -499,6 +584,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       markDeleted,
       setViewOrder,
       queueUpload,
+      queueReplace,
       refresh,
     }),
     [
@@ -519,6 +605,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       markDeleted,
       setViewOrder,
       queueUpload,
+      queueReplace,
       refresh,
     ],
   );

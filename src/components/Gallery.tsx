@@ -452,7 +452,10 @@ function GalleryCard({
   const openClickTimer = useRef<number | null>(null);
   const suppressOpenRef = useRef(false);
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const { queueReplace, draft } = useAdmin();
   const pending = Boolean(photo.id?.startsWith("pending:"));
+  const replaced = Boolean(photo.id && draft.replaces[photo.id]);
 
   const clearOpenTimer = () => {
     if (openClickTimer.current) {
@@ -841,6 +844,11 @@ function GalleryCard({
                   New
                 </p>
               ) : null}
+              {replaced ? (
+                <p className="pointer-events-none absolute top-2 right-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember">
+                  Replaced
+                </p>
+              ) : null}
             </>
           ) : null}
 
@@ -947,6 +955,28 @@ function GalleryCard({
                 +
               </button>
             </span>
+            <button
+              type="button"
+              disabled={busy || !photo.id}
+              onClick={() => replaceInputRef.current?.click()}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-xs tracking-[0.04em] text-paper disabled:opacity-30"
+              aria-label="Replace photo file"
+            >
+              Replace
+            </button>
+            <input
+              ref={replaceInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                const err = queueReplace(photo, file);
+                if (err) window.alert(err);
+              }}
+            />
             <button
               type="button"
               disabled={busy || !photo.id}

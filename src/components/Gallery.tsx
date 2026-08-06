@@ -192,15 +192,14 @@ function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
 }
 
 function useGalleryLayout() {
-  const [cols, setCols] = useState(1);
+  const [cols, setCols] = useState(3);
   const [baseCellWidth, setBaseCellWidth] = useState(320);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateCols = () => {
-      if (window.matchMedia("(min-width: 1024px)").matches) setCols(3);
-      else if (window.matchMedia("(min-width: 640px)").matches) setCols(2);
-      else setCols(1);
+      // One column on narrow phones; three per row everywhere else.
+      setCols(window.matchMedia("(min-width: 640px)").matches ? 3 : 1);
     };
     updateCols();
     window.addEventListener("resize", updateCols);

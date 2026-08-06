@@ -7,7 +7,7 @@ import { getPhotos } from "@/lib/photos";
 export const metadata: Metadata = {
   title: "After Dark | Fatni Photography",
   description:
-    "After Dark series is a project showcasing the artist's vision of the world when day gives way to night.",
+    "After Dark series is a project showcasing the artist's vision of the world after nightfall.",
 };
 
 export const dynamic = "force-dynamic";

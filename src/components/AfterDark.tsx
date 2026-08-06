@@ -51,7 +51,7 @@ export function AfterDark({
           </h1>
           <p className="animate-rise delay-3 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
             After Dark series is a project showcasing the artist&apos;s vision of
-            the world when day gives way to night. He has been fascinated by the
+            the world after nightfall. He has been fascinated by the
             world after dark for a long time due to its unique rhythm and
             atmosphere.
           </p>
@@ -80,7 +80,7 @@ export function AfterDark({
           </h1>
           <p className="mt-4 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
             After Dark series is a project showcasing the artist&apos;s vision of
-            the world when day gives way to night. He has been fascinated by the
+            the world after nightfall. He has been fascinated by the
             world after dark for a long time due to its unique rhythm and
             atmosphere.
           </p>

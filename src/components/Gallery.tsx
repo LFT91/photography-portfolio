@@ -740,8 +740,53 @@ function GalleryCard({
             >
               →
             </button>
-            <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
-              {scalePct}%
+            <span className="mx-1 inline-flex items-center gap-0.5 border border-line bg-ink/85 px-1 py-0.5">
+              <span className="px-1 text-fog" aria-hidden title="Zoom">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <circle cx="10.5" cy="10.5" r="6.5" />
+                  <path d="M16 16l5 5" />
+                </svg>
+              </span>
+              <button
+                type="button"
+                disabled={busy || liveScale <= SCALE_MIN}
+                onClick={() => {
+                  const next = clampScale(liveScale - 0.05);
+                  setLiveScale(next);
+                  liveScaleRef.current = next;
+                  onScale(photo, next);
+                }}
+                className="px-1.5 py-0.5 font-brand text-sm text-paper disabled:opacity-30"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+              <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
+                {scalePct}%
+              </span>
+              <button
+                type="button"
+                disabled={busy || liveScale >= SCALE_LAYOUT_MAX}
+                onClick={() => {
+                  const next = clampScale(liveScale + 0.05);
+                  setLiveScale(next);
+                  liveScaleRef.current = next;
+                  onScale(photo, next);
+                }}
+                className="px-1.5 py-0.5 font-brand text-sm text-paper disabled:opacity-30"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
             </span>
             <button
               type="button"

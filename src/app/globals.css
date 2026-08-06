@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0b0c0e;
+  --ink-soft: #14161a;
+  --fog: #9aa3ad;
+  --paper: #ece7df;
+  --paper-dim: #c8c2b8;
+  --moon: #8fa0b0;
+  --ember: #c9a66b;
+  --line: rgba(236, 231, 223, 0.12);
+  --background: var(--ink);
+  --foreground: var(--paper);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-fog: var(--fog);
+  --color-paper: var(--paper);
+  --color-paper-dim: var(--paper-dim);
+  --color-moon: var(--moon);
+  --color-ember: var(--ember);
+  --color-line: var(--line);
+  --font-family-brand: var(--font-brand-family);
+  --font-family-display: var(--font-display-family);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-brand-family), "Palatino Linotype", Palatino, Georgia,
+    serif;
+  min-height: 100%;
+}
+
+.font-brand {
+  font-family: var(--font-brand-family), "Palatino Linotype", Palatino, Georgia,
+    serif;
+}
+
+.font-display {
+  font-family: var(--font-display-family), "Palatino Linotype", Palatino,
+    Georgia, serif;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--ember) 55%, transparent);
+  color: var(--ink);
+}
+
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-soft {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade {
+  animation: fade-in 1.1s ease both;
+}
+
+.animate-hero-image {
+  animation: scale-soft 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.delay-1 {
+  animation-delay: 0.12s;
+}
+
+.delay-2 {
+  animation-delay: 0.28s;
+}
+
+.delay-3 {
+  animation-delay: 0.44s;
+}
+
+.delay-4 {
+  animation-delay: 0.6s;
+}
+
+.gallery-item {
+  opacity: 0;
+  transform: translateY(1rem);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gallery-item.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Discourage casual save / drag / iOS long-press on photos */
+.protect-media {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.gallery-item img {
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.015);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-rise,
+  .animate-fade,
+  .animate-hero-image,
+  .gallery-item,
+  .gallery-item img {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

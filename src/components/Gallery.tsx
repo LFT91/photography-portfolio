@@ -78,7 +78,10 @@ function Lightbox({
       aria-modal="true"
       aria-label={photo.title}
     >
-      <div className="flex items-center justify-between px-5 pt-5 sm:px-8">
+      <div
+        className="flex items-center justify-between px-5 pt-5 sm:px-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         <p className="font-brand text-sm tracking-[0.14em] text-fog tabular-nums">
           {String(index + 1).padStart(2, "0")}
           <span className="mx-2 text-line">—</span>
@@ -86,7 +89,10 @@ function Lightbox({
         </p>
         <button
           type="button"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="font-brand text-sm tracking-[0.08em] text-paper-dim transition-colors hover:text-paper"
         >
           Close
@@ -121,10 +127,8 @@ function Lightbox({
           </>
         ) : null}
 
-        <div
-          className="flex w-full max-w-6xl flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
+        {/* pointer-events-none so dark space around the photo still closes */}
+        <div className="pointer-events-none flex w-full max-w-6xl flex-col">
           <div
             key={photo.src}
             className="lightbox-frame relative mx-auto h-[68svh] w-full sm:h-[72svh]"
@@ -137,7 +141,6 @@ function Lightbox({
               className="pointer-events-none object-contain"
               priority
             />
-            <div className="absolute inset-0" aria-hidden />
           </div>
 
           <div className="mt-5 flex items-baseline justify-between gap-4 px-1">

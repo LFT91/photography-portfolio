@@ -95,5 +95,8 @@ const rank: Record<PhotoOrientation, number> = {
 };
 
 export function photoOrientationRank(src: string): number {
-  return rank[photoOrientations[src] ?? "landscape"];
+  const local = src.includes("/images/")
+    ? src.slice(src.indexOf("/images/"))
+    : src;
+  return rank[photoOrientations[local] ?? photoOrientations[src] ?? "landscape"];
 }

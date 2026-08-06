@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   categories as workCategories,
   type Photo,
@@ -29,9 +29,11 @@ export function AdminPanel() {
 
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<PhotoCategory[]>([
     "Nature",
   ]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(
     () => (configured ? createClient() : null),
@@ -159,9 +161,25 @@ export function AdminPanel() {
 
     setTitle("");
     setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setSelectedCategories(["Nature"]);
     await loadPhotos();
     setBusy(false);
+  };
+
+  const pickFiles = (list: FileList | null) => {
+    const next = list?.[0];
+    if (!next) return;
+    if (!next.type.startsWith("image/")) {
+      setError("Please drop an image file.");
+      return;
+    }
+    setError(null);
+    setFile(next);
+    if (!title.trim()) {
+      const base = next.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+      setTitle(base);
+    }
   };
 
   const removePhoto = async (photo: Photo) => {
@@ -340,12 +358,60 @@ export function AdminPanel() {
             Image
           </span>
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/*"
-            required
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mt-2 w-full font-brand text-sm text-paper-dim file:mr-4 file:border file:border-line file:bg-transparent file:px-3 file:py-2 file:text-paper"
+            className="sr-only"
+            onChange={(e) => pickFiles(e.target.files)}
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              pickFiles(e.dataTransfer.files);
+            }}
+            className={`mt-2 flex w-full flex-col items-center justify-center gap-2 border border-dashed px-4 py-10 text-center transition-colors ${
+              dragOver
+                ? "border-ember bg-ember/10 text-ember"
+                : file
+                  ? "border-line bg-ink-soft text-paper"
+                  : "border-line text-paper-dim hover:border-fog hover:text-paper"
+            }`}
+          >
+            {file ? (
+              <>
+                <span className="font-brand text-sm tracking-[0.06em] text-paper">
+                  {file.name}
+                </span>
+                <span className="font-brand text-xs text-fog">
+                  Click or drop to replace
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-brand text-sm tracking-[0.06em]">
+                  Drop photo here, or click to browse
+                </span>
+                <span className="font-brand text-xs text-fog">
+                  JPG, PNG, or WebP
+                </span>
+              </>
+            )}
+          </button>
         </label>
         <fieldset>
           <legend className="font-brand text-xs tracking-[0.12em] text-fog uppercase">

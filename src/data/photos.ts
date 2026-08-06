@@ -334,13 +334,13 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/2F2E8CA6-A1DB-44ED-8879-E56955B99845.jpg",
     title: "After Dark 09",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 53,
   },
   {
     src: "/images/after-dark/46DB8C35-3B6D-4D6C-A04B-C7D5507F76D2.jpg",
     title: "Path Light",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 54,
   },
   {
@@ -380,21 +380,15 @@ export const photos: Photo[] = [
     sortOrder: 60,
   },
   {
-    src: "/images/after-dark/park-plaza.jpg",
-    title: "Park Plaza",
-    categories: ["After Dark"],
-    sortOrder: 61,
-  },
-  {
     src: "/images/after-dark/path-lights.jpg",
     title: "Path Lights",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 62,
   },
   {
     src: "/images/after-dark/lone-lamp.jpg",
     title: "Lone Lamp",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 63,
   },
   {
@@ -454,7 +448,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/fog-brake-lights.jpg",
     title: "Fog Brake Lights",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 73,
   },
   {
@@ -484,7 +478,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/fog-station-pass.jpg",
     title: "Fog Station Pass",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 78,
   },
   {
@@ -498,12 +492,6 @@ export const photos: Photo[] = [
     title: "Tower Bridge Fog",
     categories: ["After Dark"],
     sortOrder: 80,
-  },
-  {
-    src: "/images/after-dark/troubadour.jpg",
-    title: "Troubadour",
-    categories: ["After Dark"],
-    sortOrder: 81,
   },
   {
     src: "/images/monochrome/spiral-stairs.jpg",

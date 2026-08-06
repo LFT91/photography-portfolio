@@ -34,7 +34,7 @@ export function ContactForm() {
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-8">
       <label className="block">
-        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper-dim">
+        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper/75">
           Name
         </span>
         <input
@@ -42,13 +42,13 @@ export function ContactForm() {
           type="text"
           required
           autoComplete="name"
-          className="w-full border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog/50 focus:border-ember"
+          className="w-full border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog focus:border-ember"
           placeholder="Your name"
         />
       </label>
 
       <label className="block">
-        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper-dim">
+        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper/75">
           Email
         </span>
         <input
@@ -56,20 +56,20 @@ export function ContactForm() {
           type="email"
           required
           autoComplete="email"
-          className="w-full border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog/50 focus:border-ember"
+          className="w-full border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog focus:border-ember"
           placeholder="you@email.com"
         />
       </label>
 
       <label className="block">
-        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper-dim">
+        <span className="mb-2 block font-brand text-sm tracking-[0.08em] text-paper/75">
           Message
         </span>
         <textarea
           name="message"
           required
           rows={5}
-          className="w-full resize-y border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog/50 focus:border-ember"
+          className="w-full resize-y border-b border-line bg-transparent py-3 font-brand text-lg text-paper outline-none transition-colors placeholder:text-fog focus:border-ember"
           placeholder="What can I help with?"
         />
       </label>
@@ -78,13 +78,13 @@ export function ContactForm() {
         <button
           type="submit"
           disabled={status === "sending"}
-          className="inline-flex items-center gap-3 border border-paper/50 bg-paper/10 px-7 py-3.5 font-brand text-lg tracking-[0.06em] text-paper transition-colors hover:border-ember hover:bg-ember/15 hover:text-ember disabled:opacity-50"
+          className="inline-flex items-center gap-3 border border-paper/65 bg-paper/12 px-7 py-3.5 font-brand text-lg tracking-[0.06em] text-paper transition-colors hover:border-ember hover:bg-ember/15 hover:text-ember disabled:opacity-50"
         >
           Send message
           <span aria-hidden>→</span>
         </button>
         {status === "sent" ? (
-          <p className="font-brand text-sm text-paper-dim">
+          <p className="font-brand text-sm text-paper/80">
             Opening your email app…
           </p>
         ) : null}

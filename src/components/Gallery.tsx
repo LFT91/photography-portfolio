@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -146,7 +147,7 @@ function Lightbox({
               src={photo.src}
               alt={photo.title}
               fill
-              sizes="100vw"
+              sizes="(max-width: 1152px) 100vw, 1152px"
               className="pointer-events-none object-contain"
               priority
             />
@@ -486,10 +487,19 @@ function GalleryCard({
     liveScaleRef.current = savedScale;
   }, [savedScale]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.classList.remove("is-visible");
+
+    // Reveal above-the-fold tiles before paint so category switches
+    // and first load aren't a blank dark frame.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      el.classList.add("is-visible");
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -497,7 +507,7 @@ function GalleryCard({
           observer.unobserve(el);
         }
       },
-      { threshold: 0.12 },
+      { threshold: 0.08, rootMargin: "40px 0px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -591,7 +601,7 @@ function GalleryCard({
         editing ? "is-editing" : ""
       } ${pending ? "opacity-90" : ""}`}
       style={{
-        transitionDelay: `${(index % 6) * 60}ms`,
+        transitionDelay: `${(index % 6) * 25}ms`,
         gridColumn: `span ${span} / span ${span}`,
       }}
       onDragOver={
@@ -757,9 +767,9 @@ function GalleryCard({
               <ProtectedImage
                 src={photo.src}
                 alt={photo.title}
-                width={1600}
-                height={1200}
-                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                width={800}
+                height={600}
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
                 className="pointer-events-none h-auto w-full"
                 style={{ width: "100%", height: "auto" }}
                 draggable={false}
@@ -774,9 +784,9 @@ function GalleryCard({
                 <ProtectedImage
                   src={photo.src}
                   alt={photo.title}
-                  width={1600}
-                  height={1200}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  width={800}
+                  height={600}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
                   className="h-auto w-full"
                   style={{ width: "100%", height: "auto" }}
                   draggable={false}

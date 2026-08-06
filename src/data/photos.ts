@@ -68,22 +68,10 @@ export const photos: Photo[] = [
     sortOrder: 7,
   },
   {
-    src: "/images/after-dark/79EA2245-F2AB-4F25-9A04-24007995E9C8.jpg",
-    title: "Black Sand Ice",
-    categories: ["Nature"],
-    sortOrder: 8,
-  },
-  {
     src: "/images/after-dark/7E7A53E3-49A2-4BAA-8967-255434470242.jpg",
     title: "Sea Stacks",
     categories: ["Nature"],
     sortOrder: 9,
-  },
-  {
-    src: "/images/after-dark/8C6C41DB-FBDB-449A-9DE0-C9E1164A3876.jpg",
-    title: "Fog Shore",
-    categories: ["Nature"],
-    sortOrder: 10,
   },
   {
     src: "/images/after-dark/DABA4D9F-F725-4871-ADF1-33567E2253C0.jpg",
@@ -200,12 +188,6 @@ export const photos: Photo[] = [
     sortOrder: 30,
   },
   {
-    src: "/images/after-dark/lit-window.jpg",
-    title: "Lit Window",
-    categories: ["Urban"],
-    sortOrder: 31,
-  },
-  {
     src: "/images/after-dark/window-grid.jpg",
     title: "Window Grid",
     categories: ["Urban"],
@@ -216,12 +198,6 @@ export const photos: Photo[] = [
     title: "Northern Lights",
     categories: ["Astro"],
     sortOrder: 33,
-  },
-  {
-    src: "/images/after-dark/1851EDDA-6D5C-40B1-A230-02BA6C0A6369.jpg",
-    title: "Aurora Shore",
-    categories: ["Astro"],
-    sortOrder: 34,
   },
   {
     src: "/images/after-dark/26CDFA76-BFEA-4266-93DC-7A4BA3512337.jpg",
@@ -284,15 +260,9 @@ export const photos: Photo[] = [
     sortOrder: 44,
   },
   {
-    src: "/images/after-dark/IMG_1610.jpg",
-    title: "Circumpolar Path",
-    categories: ["Astro"],
-    sortOrder: 45,
-  },
-  {
     src: "/images/after-dark/FIRE50edit.jpg",
     title: "Steel Wool Stars",
-    categories: ["Astro"],
+    categories: ["Urban"],
     sortOrder: 46,
   },
   {
@@ -382,14 +352,8 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/path-lights.jpg",
     title: "Path Lights",
-    categories: ["Street"],
+    categories: ["After Dark"],
     sortOrder: 62,
-  },
-  {
-    src: "/images/after-dark/lone-lamp.jpg",
-    title: "Lone Lamp",
-    categories: ["Street"],
-    sortOrder: 63,
   },
   {
     src: "/images/after-dark/night-train.jpg",

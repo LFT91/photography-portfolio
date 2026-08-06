@@ -13,14 +13,11 @@ export function SiteAdminBar() {
     saving,
     saveError,
     saveDraft,
-    discardDraft,
   } = useAdmin();
 
   if (!ready || !user) return null;
 
   const onCancel = () => {
-    if (dirty && !window.confirm("Discard all unsaved edits?")) return;
-    if (dirty) discardDraft();
     setEditing(false);
   };
 

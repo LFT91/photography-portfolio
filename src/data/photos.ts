@@ -38,12 +38,6 @@ export const photos: Photo[] = [
     sortOrder: 1,
   },
   {
-    src: "/images/DJI_0381-Edit.jpg",
-    title: "Coast",
-    categories: ["Nature"],
-    sortOrder: 2,
-  },
-  {
     src: "/images/coastal-cove.jpg",
     title: "Coastal Cove",
     categories: ["Nature"],
@@ -192,12 +186,6 @@ export const photos: Photo[] = [
     title: "Blue Domes",
     categories: ["Urban"],
     sortOrder: 27,
-  },
-  {
-    src: "/images/after-dark/7CF5E002-F8CC-449A-B1A5-B2F757C34CD3.jpg",
-    title: "London Eye",
-    categories: ["Urban"],
-    sortOrder: 28,
   },
   {
     src: "/images/after-dark/A7302924.jpg",
@@ -376,7 +364,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/shared-umbrella.jpg",
     title: "Shared Umbrella",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 58,
   },
   {
@@ -436,7 +424,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/late-cafe.jpg",
     title: "Late Cafe",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 68,
   },
   {
@@ -448,13 +436,13 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/moulin-rouge.jpg",
     title: "Moulin Rouge",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 70,
   },
   {
     src: "/images/after-dark/piccadilly-crowd.jpg",
     title: "Piccadilly Crowd",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 71,
   },
   {
@@ -558,12 +546,6 @@ export const photos: Photo[] = [
     title: "Blindfold Piano",
     categories: ["Monochrome"],
     sortOrder: 88,
-  },
-  {
-    src: "/images/monochrome/afternoon-rest.jpg",
-    title: "Afternoon Rest",
-    categories: ["Monochrome"],
-    sortOrder: 89,
   },
   {
     src: "/images/urban/marina-viaduct.jpg",

@@ -42,17 +42,23 @@ export function AfterDark({
           aria-hidden
         />
 
-        <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center px-5 text-center sm:px-8">
-          <p className="animate-rise delay-1 mb-5 font-brand text-sm tracking-[0.28em] text-ember uppercase sm:text-base">
-            After Dark
+        <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center px-5 text-center sm:px-8">
+          <p className="animate-rise delay-1 mb-4 font-brand text-xs tracking-[0.32em] text-ember uppercase sm:text-sm">
+            A project
           </p>
-          <h1 className="animate-rise delay-2 font-display text-4xl italic leading-[1.1] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-6xl lg:text-7xl">
-            The quiet hours of night.
+          <h1 className="animate-rise delay-2 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
+            After Dark
           </h1>
+          <p className="animate-rise delay-3 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
+            After Dark series is a project showcasing the artist&apos;s vision of
+            the world when day gives way to night. He has been fascinated by the
+            world after dark for a long time due to its unique rhythm and
+            atmosphere.
+          </p>
           <button
             type="button"
             onClick={() => setEntered(true)}
-            className="animate-rise delay-3 mt-12 inline-flex items-center gap-3 border border-white/70 bg-black/45 px-8 py-4 font-brand text-lg tracking-[0.08em] text-white shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-colors hover:border-ember hover:bg-ember/20 hover:text-ember sm:text-xl"
+            className="animate-rise delay-4 mt-10 inline-flex items-center gap-2 border border-white/55 bg-black/40 px-6 py-3 font-brand text-sm tracking-[0.14em] text-white/95 backdrop-blur-sm transition-colors hover:border-ember hover:bg-ember/15 hover:text-ember"
           >
             Enter
             <span aria-hidden>→</span>
@@ -72,8 +78,11 @@ export function AfterDark({
           <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
             After Dark
           </h1>
-          <p className="mt-4 max-w-lg font-brand text-base text-paper-dim sm:text-lg">
-            Fog, rain, and the quiet hours — how I see life after dark.
+          <p className="mt-4 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
+            After Dark series is a project showcasing the artist&apos;s vision of
+            the world when day gives way to night. He has been fascinated by the
+            world after dark for a long time due to its unique rhythm and
+            atmosphere.
           </p>
         </div>
       </div>

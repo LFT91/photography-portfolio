@@ -183,12 +183,23 @@ function Lightbox({
   );
 }
 
-/** Scale is relative to one grid cell (100% = full column). */
+/** 100% = one grid column; up to 300% spans up to three columns. */
 const SCALE_MIN = 0.45;
-const SCALE_LAYOUT_MAX = 1;
+const SCALE_LAYOUT_MAX = 3;
 
 function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
   return Math.round(Math.min(max, Math.max(SCALE_MIN, n)) * 100) / 100;
+}
+
+/** How many grid columns a scale should occupy. */
+function spanForScale(scale: number, cols: number) {
+  if (cols <= 1 || scale <= 1) return 1;
+  if (scale <= 2) return Math.min(2, cols);
+  return cols;
+}
+
+function widthPctForScale(scale: number, span: number) {
+  return Math.round((scale / span) * 1000) / 10;
 }
 
 function useGalleryLayout() {
@@ -524,6 +535,7 @@ function GalleryCard({
     const startX = e.clientX;
     const startY = e.clientY;
     const startScale = liveScaleRef.current;
+    const scaleMax = Math.min(SCALE_LAYOUT_MAX, cols);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
@@ -533,6 +545,7 @@ function GalleryCard({
       const dy = ev.clientY - startY;
       const next = clampScale(
         startScale + resizeDelta(edge, dx, dy, baseCellWidth),
+        scaleMax,
       );
       liveScaleRef.current = next;
       setLiveScale(next);
@@ -558,8 +571,12 @@ function GalleryCard({
     target.addEventListener("pointercancel", onUp);
   };
 
+  const scaleMax = Math.min(SCALE_LAYOUT_MAX, cols);
+  const layoutScale = Math.min(liveScale, scaleMax);
+  const span = spanForScale(layoutScale, cols);
+  const imageWidthPct = widthPctForScale(layoutScale, span);
   const scalePct = Math.round(liveScale * 100);
-  const scalePctMax = Math.round(SCALE_LAYOUT_MAX * 100);
+  const scalePctMax = Math.round(scaleMax * 100);
   const col = index % cols;
   const row = Math.floor(index / cols);
   const canLeft = col > 0;
@@ -575,6 +592,7 @@ function GalleryCard({
       } ${pending ? "opacity-90" : ""}`}
       style={{
         transitionDelay: `${(index % 6) * 60}ms`,
+        gridColumn: `span ${span} / span ${span}`,
       }}
       onDragOver={
         editing
@@ -612,7 +630,7 @@ function GalleryCard({
           className={`relative mx-auto bg-ink-soft ${
             editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
           }`}
-          style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
+          style={{ width: `${imageWidthPct}%` }}
           draggable={editing && !busy}
           onPointerDown={
             editing
@@ -927,7 +945,7 @@ function GalleryCard({
                 type="button"
                 disabled={busy || liveScale <= SCALE_MIN}
                 onClick={() => {
-                  const next = clampScale(liveScale - 0.05);
+                  const next = clampScale(liveScale - 0.05, scaleMax);
                   setLiveScale(next);
                   liveScaleRef.current = next;
                   onScale(photo, next);
@@ -942,9 +960,9 @@ function GalleryCard({
               </span>
               <button
                 type="button"
-                disabled={busy || liveScale >= SCALE_LAYOUT_MAX}
+                disabled={busy || liveScale >= scaleMax}
                 onClick={() => {
-                  const next = clampScale(liveScale + 0.05);
+                  const next = clampScale(liveScale + 0.05, scaleMax);
                   setLiveScale(next);
                   liveScaleRef.current = next;
                   onScale(photo, next);
@@ -1183,7 +1201,7 @@ export function Gallery({
         ) : (
           <div
             ref={galleryRef}
-            className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3 sm:gap-4"
+            className="grid grid-cols-1 grid-flow-dense items-start gap-3 sm:grid-cols-3 sm:gap-4"
           >
             {filtered.map((photo, index) => (
               <GalleryCard

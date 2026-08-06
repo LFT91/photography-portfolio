@@ -382,8 +382,10 @@ function GalleryCard({
     <div
       ref={ref}
       className={`gallery-item group relative mb-3 w-full break-inside-avoid md:mb-4 ${
-        dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""
-      } ${pending ? "opacity-90" : ""}`}
+        editing ? "is-editing" : ""
+      } ${dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""} ${
+        pending ? "opacity-90" : ""
+      }`}
       style={{ transitionDelay: `${(index % 6) * 60}ms` }}
       onDragOver={
         editing
@@ -419,33 +421,49 @@ function GalleryCard({
         className="relative mx-auto bg-ink-soft"
         style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
       >
-        <button
-          type="button"
-          onClick={() => {
-            if (!editing) onOpen(photo);
-          }}
+        <div
+          className="relative w-full overflow-hidden"
           onContextMenu={(e) => e.preventDefault()}
-          className="block w-full overflow-hidden text-left"
         >
-          <ProtectedImage
-            src={photo.src}
-            alt={photo.title}
-            width={1600}
-            height={1200}
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="h-auto w-full"
-            style={{ width: "100%", height: "auto" }}
-            draggable={false}
-          />
-          {!editing ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
-              <p className="font-display text-xl italic text-paper">{photo.title}</p>
-              <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-                {photo.categories.join(" · ")}
-              </p>
-            </div>
-          ) : null}
-        </button>
+          {editing ? (
+            <ProtectedImage
+              src={photo.src}
+              alt={photo.title}
+              width={1600}
+              height={1200}
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="h-auto w-full"
+              style={{ width: "100%", height: "auto" }}
+              draggable={false}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpen(photo)}
+              onContextMenu={(e) => e.preventDefault()}
+              className="block w-full overflow-hidden text-left"
+            >
+              <ProtectedImage
+                src={photo.src}
+                alt={photo.title}
+                width={1600}
+                height={1200}
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="h-auto w-full"
+                style={{ width: "100%", height: "auto" }}
+                draggable={false}
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+                <p className="font-display text-xl italic text-paper">
+                  {photo.title}
+                </p>
+                <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+                  {photo.categories.join(" · ")}
+                </p>
+              </div>
+            </button>
+          )}
+        </div>
 
         {editing ? (
           <>
@@ -457,12 +475,19 @@ function GalleryCard({
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/photo-index", String(index));
                 e.dataTransfer.effectAllowed = "move";
+                // Keep the photo fully visible while dragging (browsers often dim the source).
+                const card = ref.current;
+                if (card) {
+                  requestAnimationFrame(() => {
+                    card.style.opacity = "1";
+                  });
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === "ArrowUp") onMove(index, -1);
                 if (e.key === "ArrowDown") onMove(index, 1);
               }}
-              className="absolute top-2 left-1/2 z-10 -translate-x-1/2 cursor-grab select-none border border-line bg-ink/85 px-2.5 py-1 font-brand text-xs tracking-[0.12em] text-paper backdrop-blur-sm active:cursor-grabbing"
+              className="absolute top-2 left-1/2 z-10 -translate-x-1/2 cursor-grab select-none border border-line bg-ink/70 px-2.5 py-1 font-brand text-xs tracking-[0.12em] text-paper active:cursor-grabbing"
             >
               ⋮⋮ move
             </div>

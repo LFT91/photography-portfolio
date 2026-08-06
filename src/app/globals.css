@@ -157,6 +157,14 @@ body {
   transform: scale(1.015);
 }
 
+/* Keep photos fully visible while admin is grabbing / resizing */
+.gallery-item.is-editing:hover img,
+.gallery-item.is-editing img {
+  transform: none;
+  filter: none;
+  opacity: 1;
+}
+
 @keyframes lightbox-in {
   from {
     opacity: 0;

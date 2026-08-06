@@ -17,7 +17,7 @@ export default async function WorkPage() {
     <>
       <Header solid />
       <main className="min-h-svh pt-16 sm:pt-20">
-        <Gallery title="Gallery" tightTop items={photos} />
+        <Gallery title="Gallery" tightTop items={photos} highlightAfterDark />
       </main>
       <Footer />
     </>

@@ -73,15 +73,14 @@ export function AfterDark({
             After Dark
           </h1>
           <p className="mt-4 max-w-lg font-brand text-base text-paper-dim sm:text-lg">
-            Nightscapes, starscapes, and streets after dark.
+            Fog, rain, and the quiet hours — how I see life after dark.
           </p>
         </div>
       </div>
 
       <Gallery
-        lockedCategory="Night"
+        lockedCategory="After Dark"
         showFilters={false}
-        showNightFilters
         title=""
         tightTop
         items={items}

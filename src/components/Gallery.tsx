@@ -183,9 +183,55 @@ function Lightbox({
   );
 }
 
-function clampScale(n: number) {
-  // Max 100% of the column so enlarging pushes neighbours instead of overlapping them.
-  return Math.round(Math.min(1, Math.max(0.45, n)) * 100) / 100;
+/** Absolute layout ceiling: 3× a base column ≈ full row on desktop. */
+const SCALE_MIN = 0.45;
+const SCALE_LAYOUT_MAX = 3;
+
+function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
+  return Math.round(Math.min(max, Math.max(SCALE_MIN, n)) * 100) / 100;
+}
+
+/** Largest scale that stays sharp for this file at the current column width. */
+function qualityMaxScale(naturalWidth: number, baseCellWidth: number) {
+  if (!naturalWidth || baseCellWidth <= 0) return SCALE_LAYOUT_MAX;
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  // Stop when CSS width would exceed native pixels (1:1 device pixels).
+  const max = naturalWidth / (dpr * baseCellWidth);
+  return clampScale(max, SCALE_LAYOUT_MAX);
+}
+
+function useGalleryLayout() {
+  const [cols, setCols] = useState(1);
+  const [baseCellWidth, setBaseCellWidth] = useState(320);
+  const galleryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateCols = () => {
+      if (window.matchMedia("(min-width: 1024px)").matches) setCols(3);
+      else if (window.matchMedia("(min-width: 640px)").matches) setCols(2);
+      else setCols(1);
+    };
+    updateCols();
+    window.addEventListener("resize", updateCols);
+    return () => window.removeEventListener("resize", updateCols);
+  }, []);
+
+  useEffect(() => {
+    const el = galleryRef.current;
+    if (!el) return;
+    const measure = () => {
+      const styles = getComputedStyle(el);
+      const gap = parseFloat(styles.columnGap || styles.gap || "16") || 16;
+      const w = el.clientWidth;
+      setBaseCellWidth(Math.max(1, (w - gap * (cols - 1)) / cols));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [cols]);
+
+  return { cols, baseCellWidth, galleryRef };
 }
 
 type ResizeEdge =
@@ -219,6 +265,7 @@ function ResizeHandle({
   className,
   label,
   scalePct,
+  scalePctMax,
   onResize,
 }: {
   edge: ResizeEdge;
@@ -226,6 +273,7 @@ function ResizeHandle({
   className: string;
   label: string;
   scalePct: number;
+  scalePctMax: number;
   onResize: (edge: ResizeEdge, e: ReactPointerEvent) => void;
 }) {
   return (
@@ -233,7 +281,7 @@ function ResizeHandle({
       role="slider"
       aria-label={label}
       aria-valuemin={45}
-      aria-valuemax={100}
+      aria-valuemax={scalePctMax}
       aria-valuenow={scalePct}
       tabIndex={0}
       onPointerDown={(e) => onResize(edge, e)}
@@ -321,6 +369,7 @@ function GalleryCard({
   onOpen,
   editing,
   busy,
+  baseCellWidth,
   onMove,
   onRemove,
   onScale,
@@ -335,6 +384,7 @@ function GalleryCard({
   onOpen: (photo: Photo) => void;
   editing: boolean;
   busy: boolean;
+  baseCellWidth: number;
   onMove: (from: number, direction: -1 | 1) => void;
   onRemove: (photo: Photo) => void;
   onScale: (photo: Photo, next: number) => void;
@@ -346,7 +396,9 @@ function GalleryCard({
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const [soft, setSoft] = useState(false);
-  const savedScale = clampScale(photo.displayScale ?? 1);
+  const [naturalWidth, setNaturalWidth] = useState(0);
+  const qualityMax = qualityMaxScale(naturalWidth, baseCellWidth);
+  const savedScale = clampScale(photo.displayScale ?? 1, qualityMax);
   const [liveScale, setLiveScale] = useState(savedScale);
   const liveScaleRef = useRef(savedScale);
   const resizingRef = useRef(false);
@@ -383,8 +435,9 @@ function GalleryCard({
 
     const check = () => {
       const natural = img.naturalWidth;
+      if (natural > 0) setNaturalWidth(natural);
       const shown = img.clientWidth * (window.devicePixelRatio || 1);
-      setSoft(natural > 0 && shown > natural * 1.08);
+      setSoft(natural > 0 && shown > natural);
     };
 
     if (img.complete) check();
@@ -394,27 +447,37 @@ function GalleryCard({
       img.removeEventListener("load", check);
       window.removeEventListener("resize", check);
     };
-  }, [photo.src, liveScale]);
+  }, [photo.src, liveScale, baseCellWidth]);
+
+  useEffect(() => {
+    if (resizingRef.current) return;
+    const next = clampScale(liveScaleRef.current, qualityMax);
+    if (Math.abs(next - liveScaleRef.current) >= 0.01) {
+      liveScaleRef.current = next;
+      setLiveScale(next);
+    }
+  }, [qualityMax]);
 
   const startResize = (edge: ResizeEdge, e: ReactPointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (busy || !ref.current) return;
-
-    const colW = ref.current.clientWidth;
-    if (colW <= 0) return;
+    if (busy || baseCellWidth <= 0) return;
 
     resizingRef.current = true;
     const startX = e.clientX;
     const startY = e.clientY;
     const startScale = liveScaleRef.current;
+    const max = qualityMaxScale(naturalWidth, baseCellWidth);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
     const onPtrMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
-      const next = clampScale(startScale + resizeDelta(edge, dx, dy, colW));
+      const next = clampScale(
+        startScale + resizeDelta(edge, dx, dy, baseCellWidth),
+        max,
+      );
       liveScaleRef.current = next;
       setLiveScale(next);
     };
@@ -435,16 +498,25 @@ function GalleryCard({
   };
 
   const scalePct = Math.round(liveScale * 100);
+  const scalePctMax = Math.round(qualityMax * 100);
+  const tileWidth =
+    baseCellWidth > 0
+      ? `min(100%, ${Math.round(baseCellWidth * liveScale * 10) / 10}px)`
+      : `${Math.round(liveScale * 1000) / 10}%`;
 
   return (
     <div
       ref={ref}
-      className={`gallery-item group relative w-full ${
+      className={`gallery-item group relative shrink-0 ${
         editing ? "is-editing" : ""
       } ${dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""} ${
         pending ? "opacity-90" : ""
       }`}
-      style={{ transitionDelay: `${(index % 6) * 60}ms` }}
+      style={{
+        transitionDelay: `${(index % 6) * 60}ms`,
+        width: tileWidth,
+        maxWidth: "100%",
+      }}
       onDragOver={
         editing
           ? (e) => {
@@ -477,10 +549,9 @@ function GalleryCard({
       <div className="w-full">
         <div
           ref={imgWrapRef}
-          className={`relative bg-ink-soft ${
+          className={`relative w-full bg-ink-soft ${
             editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
           }`}
-          style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
           draggable={editing && !busy}
           onDragStart={
             editing
@@ -562,6 +633,7 @@ function GalleryCard({
                 className="top-3 bottom-3 left-0 w-3 sm:w-3.5"
                 label="Resize from left"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
               <ResizeHandle
@@ -570,6 +642,7 @@ function GalleryCard({
                 className="top-3 bottom-3 right-0 w-3 sm:w-3.5"
                 label="Resize from right"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
               <ResizeHandle
@@ -578,6 +651,7 @@ function GalleryCard({
                 className="top-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
                 label="Resize from top-left"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
               <ResizeHandle
@@ -586,6 +660,7 @@ function GalleryCard({
                 className="top-0 right-0 h-4 w-4 sm:h-5 sm:w-5"
                 label="Resize from top-right"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
               <ResizeHandle
@@ -594,6 +669,7 @@ function GalleryCard({
                 className="bottom-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
                 label="Resize from bottom-left"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
               <ResizeHandle
@@ -602,6 +678,7 @@ function GalleryCard({
                 className="right-0 bottom-0 h-4 w-4 sm:h-5 sm:w-5"
                 label="Resize from bottom-right"
                 scalePct={scalePct}
+                scalePctMax={scalePctMax}
                 onResize={startResize}
               />
 
@@ -620,9 +697,11 @@ function GalleryCard({
             </>
           ) : null}
 
-          {editing && soft ? (
+          {editing && (soft || liveScale >= qualityMax - 0.01) ? (
             <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90">
-              Soft — file is smaller than display
+              {liveScale >= qualityMax - 0.01
+                ? "Max sharp size for this file"
+                : "Soft — past native resolution"}
             </p>
           ) : null}
         </div>
@@ -703,6 +782,7 @@ export function Gallery({
     markDeleted,
     setViewOrder,
   } = useAdmin();
+  const { baseCellWidth, galleryRef } = useGalleryLayout();
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
@@ -833,10 +913,9 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag a photo to reorder · edges/corners resize · double-click
-              resets to 100% · edit title below · ✕ stages delete. Photos keep
-              even spacing and reflow until you place them. Save or Cancel
-              below.
+              Drag to reorder · edges/corners resize (grows until the file would
+              look soft) · double-click resets to 100% · edit title · ✕ stages
+              delete. Neighbours reflow as you resize. Save or Cancel below.
             </p>
           </>
         ) : null}
@@ -849,7 +928,10 @@ export function Gallery({
             No photos in this section yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+          <div
+            ref={galleryRef}
+            className="flex flex-wrap content-start items-start gap-3 sm:gap-4"
+          >
             {filtered.map((photo, index) => (
               <GalleryCard
                 key={photo.id ?? photo.src}
@@ -859,6 +941,7 @@ export function Gallery({
                 onOpen={openPhoto}
                 editing={editing}
                 busy={saving}
+                baseCellWidth={baseCellWidth}
                 onMove={onMove}
                 onRemove={onRemove}
                 onScale={onScale}

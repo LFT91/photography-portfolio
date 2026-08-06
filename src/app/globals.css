@@ -157,6 +157,24 @@ body {
   transform: scale(1.015);
 }
 
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lightbox-frame {
+  animation: lightbox-in 0.35s ease both;
+}
+
+.lightbox-nav {
+  line-height: 1;
+  padding: 0.5rem 0.65rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -166,7 +184,8 @@ body {
   .animate-fade,
   .animate-hero-image,
   .gallery-item,
-  .gallery-item img {
+  .gallery-item img,
+  .lightbox-frame {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;

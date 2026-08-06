@@ -191,15 +191,6 @@ function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
   return Math.round(Math.min(max, Math.max(SCALE_MIN, n)) * 100) / 100;
 }
 
-/** Largest scale that stays sharp for this file at the current column width. */
-function qualityMaxScale(naturalWidth: number, baseCellWidth: number) {
-  if (!naturalWidth || baseCellWidth <= 0) return SCALE_LAYOUT_MAX;
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-  // Stop when CSS width would exceed native pixels (1:1 device pixels).
-  const max = naturalWidth / (dpr * baseCellWidth);
-  return clampScale(max, SCALE_LAYOUT_MAX);
-}
-
 function useGalleryLayout() {
   const [cols, setCols] = useState(1);
   const [baseCellWidth, setBaseCellWidth] = useState(320);
@@ -396,9 +387,7 @@ function GalleryCard({
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const [soft, setSoft] = useState(false);
-  const [naturalWidth, setNaturalWidth] = useState(0);
-  const qualityMax = qualityMaxScale(naturalWidth, baseCellWidth);
-  const savedScale = clampScale(photo.displayScale ?? 1, qualityMax);
+  const savedScale = clampScale(photo.displayScale ?? 1);
   const [liveScale, setLiveScale] = useState(savedScale);
   const liveScaleRef = useRef(savedScale);
   const resizingRef = useRef(false);
@@ -435,9 +424,9 @@ function GalleryCard({
 
     const check = () => {
       const natural = img.naturalWidth;
-      if (natural > 0) setNaturalWidth(natural);
       const shown = img.clientWidth * (window.devicePixelRatio || 1);
-      setSoft(natural > 0 && shown > natural);
+      // Advisory only — never blocks enlarge.
+      setSoft(natural > 0 && shown > natural * 1.08);
     };
 
     if (img.complete) check();
@@ -447,16 +436,7 @@ function GalleryCard({
       img.removeEventListener("load", check);
       window.removeEventListener("resize", check);
     };
-  }, [photo.src, liveScale, baseCellWidth]);
-
-  useEffect(() => {
-    if (resizingRef.current) return;
-    const next = clampScale(liveScaleRef.current, qualityMax);
-    if (Math.abs(next - liveScaleRef.current) >= 0.01) {
-      liveScaleRef.current = next;
-      setLiveScale(next);
-    }
-  }, [qualityMax]);
+  }, [photo.src, liveScale]);
 
   const startResize = (edge: ResizeEdge, e: ReactPointerEvent) => {
     e.preventDefault();
@@ -467,7 +447,6 @@ function GalleryCard({
     const startX = e.clientX;
     const startY = e.clientY;
     const startScale = liveScaleRef.current;
-    const max = qualityMaxScale(naturalWidth, baseCellWidth);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
@@ -476,7 +455,6 @@ function GalleryCard({
       const dy = ev.clientY - startY;
       const next = clampScale(
         startScale + resizeDelta(edge, dx, dy, baseCellWidth),
-        max,
       );
       liveScaleRef.current = next;
       setLiveScale(next);
@@ -498,7 +476,7 @@ function GalleryCard({
   };
 
   const scalePct = Math.round(liveScale * 100);
-  const scalePctMax = Math.round(qualityMax * 100);
+  const scalePctMax = Math.round(SCALE_LAYOUT_MAX * 100);
   const tileWidth =
     baseCellWidth > 0
       ? `min(100%, ${Math.round(baseCellWidth * liveScale * 10) / 10}px)`
@@ -697,11 +675,9 @@ function GalleryCard({
             </>
           ) : null}
 
-          {editing && (soft || liveScale >= qualityMax - 0.01) ? (
+          {editing && soft ? (
             <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90">
-              {liveScale >= qualityMax - 0.01
-                ? "Max sharp size for this file"
-                : "Soft — past native resolution"}
+              Soft — past native resolution (advisory)
             </p>
           ) : null}
         </div>
@@ -913,9 +889,9 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag to reorder · edges/corners resize (grows until the file would
-              look soft) · double-click resets to 100% · edit title · ✕ stages
-              delete. Neighbours reflow as you resize. Save or Cancel below.
+              Drag to reorder · edges/corners resize freely · double-click
+              resets to 100% · edit title · ✕ stages delete. Save or Cancel
+              below.
             </p>
           </>
         ) : null}

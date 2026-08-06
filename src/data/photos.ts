@@ -1,6 +1,6 @@
 export type PhotoCategory =
   | "Nature"
-  | "Architecture"
+  | "Urban"
   | "Astro"
   | "Street"
   | "Monochrome"
@@ -18,7 +18,7 @@ export type Photo = {
 /** Work gallery filters — After Dark is a separate project. */
 export const categories: PhotoCategory[] = [
   "Nature",
-  "Architecture",
+  "Urban",
   "Astro",
   "Street",
   "Monochrome",
@@ -28,7 +28,7 @@ export const photos: Photo[] = [
   {
     src: "/images/DJI_0464-HDR-Pano-Edit.jpg",
     title: "Aerial Panorama",
-    categories: ["Nature"],
+    categories: ["Urban"],
     sortOrder: 0,
   },
   {
@@ -172,55 +172,55 @@ export const photos: Photo[] = [
   {
     src: "/images/image_6483441.JPG",
     title: "Architecture",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 24,
   },
   {
     src: "/images/after-dark/0A9E1A4A-F5FB-4365-B12F-5BE1190395EB.jpg",
     title: "Night Marina",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 25,
   },
   {
     src: "/images/after-dark/12093E8F-8DE7-4233-96E1-28D8270D0C25.jpg",
     title: "Light Ring",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 26,
   },
   {
     src: "/images/after-dark/78F56291-F28E-42FD-9CDC-C4C33CF10530.jpg",
     title: "Blue Domes",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 27,
   },
   {
     src: "/images/after-dark/7CF5E002-F8CC-449A-B1A5-B2F757C34CD3.jpg",
     title: "London Eye",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 28,
   },
   {
     src: "/images/after-dark/A7302924.jpg",
     title: "City Lights",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 29,
   },
   {
     src: "/images/after-dark/D28062C8-D542-4F6F-995E-DAD7790A7EC0.jpg",
     title: "Hallgrimskirkja",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 30,
   },
   {
     src: "/images/after-dark/lit-window.jpg",
     title: "Lit Window",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 31,
   },
   {
     src: "/images/after-dark/window-grid.jpg",
     title: "Window Grid",
-    categories: ["Architecture"],
+    categories: ["Urban"],
     sortOrder: 32,
   },
   {
@@ -564,6 +564,12 @@ export const photos: Photo[] = [
     title: "Afternoon Rest",
     categories: ["Monochrome"],
     sortOrder: 89,
+  },
+  {
+    src: "/images/urban/marina-viaduct.jpg",
+    title: "Marina Viaduct",
+    categories: ["Urban"],
+    sortOrder: 90,
   },
 ];
 

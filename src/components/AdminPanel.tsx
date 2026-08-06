@@ -384,7 +384,7 @@ export function AdminPanel() {
           Library ({photos.length})
         </h2>
         <p className="mt-2 font-brand text-sm text-fog">
-          Use ↑ ↓ to reorder across Nature, Architecture, Astro, Street, Monochrome, and After Dark.
+          Use ↑ ↓ to reorder across Nature, Urban, Astro, Street, Monochrome, and After Dark.
         </p>
         <ul className="mt-8 space-y-4">
           {photos.map((photo, index) => (

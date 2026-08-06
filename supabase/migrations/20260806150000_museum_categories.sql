@@ -1,4 +1,4 @@
--- Museum rooms: Nature / Architecture / Astro / Street / Monochrome / After Dark
+-- Museum rooms: Nature / Urban / Astro / Street / Monochrome / After Dark
 -- App no longer uses night_kind subfilters.
 
 alter table public.photos drop constraint if exists photos_night_kind_check;

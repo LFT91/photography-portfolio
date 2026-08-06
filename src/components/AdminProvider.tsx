@@ -51,7 +51,7 @@ function draftIsDirty(draft: EditDraft) {
 }
 
 function clampScale(n: number) {
-  return Math.round(Math.min(1.35, Math.max(0.45, n)) * 100) / 100;
+  return Math.round(Math.min(1, Math.max(0.45, n)) * 100) / 100;
 }
 
 export function applyDraftToList(
@@ -65,13 +65,17 @@ export function applyDraftToList(
       return !draft.patches[p.id]?.deleted;
     })
     .map((p) => {
-      if (!p.id) return p;
+      if (!p.id) {
+        return { ...p, displayScale: clampScale(p.displayScale ?? 1) };
+      }
       const patch = draft.patches[p.id];
-      if (!patch) return p;
+      if (!patch) {
+        return { ...p, displayScale: clampScale(p.displayScale ?? 1) };
+      }
       return {
         ...p,
         title: patch.title ?? p.title,
-        displayScale: patch.displayScale ?? p.displayScale,
+        displayScale: clampScale(patch.displayScale ?? p.displayScale ?? 1),
       };
     });
 
@@ -83,7 +87,7 @@ export function applyDraftToList(
         src: u.previewUrl,
         title: u.title,
         categories: u.categories,
-        displayScale: u.displayScale,
+        displayScale: clampScale(u.displayScale),
         sortOrder: Number.MAX_SAFE_INTEGER,
       }),
     );

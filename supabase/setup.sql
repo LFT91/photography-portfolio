@@ -9,6 +9,8 @@ create table if not exists public.photos (
   categories text[] not null default '{}',
   night_kind text check (night_kind is null),
   sort_order integer not null default 0,
+  display_scale real not null default 1
+    check (display_scale >= 0.45 and display_scale <= 1.35),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

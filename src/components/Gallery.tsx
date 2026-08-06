@@ -185,6 +185,7 @@ function GalleryCard({
   busy,
   onMove,
   onRemove,
+  onScale,
 }: {
   photo: Photo;
   index: number;
@@ -194,8 +195,12 @@ function GalleryCard({
   busy: boolean;
   onMove: (from: number, direction: -1 | 1) => void;
   onRemove: (photo: Photo) => void;
+  onScale: (photo: Photo, next: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const imgWrapRef = useRef<HTMLDivElement>(null);
+  const [soft, setSoft] = useState(false);
+  const scale = photo.displayScale ?? 1;
 
   useEffect(() => {
     const el = ref.current;
@@ -214,42 +219,75 @@ function GalleryCard({
     return () => observer.disconnect();
   }, [photo.src]);
 
+  useEffect(() => {
+    const wrap = imgWrapRef.current;
+    if (!wrap) return;
+    const img = wrap.querySelector("img");
+    if (!img) return;
+
+    const check = () => {
+      const natural = img.naturalWidth;
+      const shown = img.clientWidth * (window.devicePixelRatio || 1);
+      setSoft(natural > 0 && shown > natural * 1.08);
+    };
+
+    if (img.complete) check();
+    else img.addEventListener("load", check);
+    window.addEventListener("resize", check);
+    return () => {
+      img.removeEventListener("load", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [photo.src, scale]);
+
   return (
     <div
       ref={ref}
-      className="gallery-item group relative mb-3 w-full break-inside-avoid overflow-hidden bg-ink-soft md:mb-4"
+      className="gallery-item group relative mb-3 w-full break-inside-avoid md:mb-4"
       style={{ transitionDelay: `${(index % 6) * 60}ms` }}
     >
-      <button
-        type="button"
-        onClick={() => onOpen(photo)}
-        onContextMenu={(e) => e.preventDefault()}
-        className="block w-full text-left"
+      <div
+        ref={imgWrapRef}
+        className="relative mx-auto overflow-hidden bg-ink-soft"
+        style={{ width: `${Math.round(scale * 1000) / 10}%` }}
       >
-        <ProtectedImage
-          src={photo.src}
-          alt={photo.title}
-          width={1600}
-          height={1200}
-          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="h-auto w-full"
-          style={{ width: "100%", height: "auto" }}
-        />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
-          <p className="font-display text-xl italic text-paper">{photo.title}</p>
-          <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-            {photo.categories.join(" · ")}
+        <button
+          type="button"
+          onClick={() => onOpen(photo)}
+          onContextMenu={(e) => e.preventDefault()}
+          className="block w-full text-left"
+        >
+          <ProtectedImage
+            src={photo.src}
+            alt={photo.title}
+            width={1600}
+            height={1200}
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="h-auto w-full"
+            style={{ width: "100%", height: "auto" }}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+            <p className="font-display text-xl italic text-paper">{photo.title}</p>
+            <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+              {photo.categories.join(" · ")}
+            </p>
+          </div>
+        </button>
+
+        {editing && soft ? (
+          <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90 backdrop-blur-sm">
+            Soft — file is smaller than display
           </p>
-        </div>
-      </button>
+        ) : null}
+      </div>
 
       {editing ? (
-        <div className="absolute top-2 right-2 z-10 flex gap-1">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
           <button
             type="button"
             disabled={busy || index === 0}
             onClick={() => onMove(index, -1)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper backdrop-blur-sm disabled:opacity-30"
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
             aria-label="Move earlier"
           >
             ↑
@@ -258,16 +296,37 @@ function GalleryCard({
             type="button"
             disabled={busy || index >= total - 1}
             onClick={() => onMove(index, 1)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper backdrop-blur-sm disabled:opacity-30"
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
             aria-label="Move later"
           >
             ↓
           </button>
           <button
             type="button"
+            disabled={busy || scale <= 0.45}
+            onClick={() => onScale(photo, scale - 0.05)}
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+            aria-label="Shrink"
+          >
+            −
+          </button>
+          <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            disabled={busy || scale >= 1.35}
+            onClick={() => onScale(photo, scale + 0.05)}
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+            aria-label="Enlarge"
+          >
+            +
+          </button>
+          <button
+            type="button"
             disabled={busy || !photo.id}
             onClick={() => onRemove(photo)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember backdrop-blur-sm disabled:opacity-30"
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember disabled:opacity-30"
             aria-label="Delete photo"
           >
             ✕
@@ -296,7 +355,7 @@ export function Gallery({
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
 }) {
-  const { editing, movePhoto, removePhoto } = useAdmin();
+  const { editing, movePhoto, removePhoto, setDisplayScale } = useAdmin();
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
@@ -338,6 +397,14 @@ export function Gallery({
     setBusy(true);
     setAdminError(null);
     const err = await removePhoto(photo);
+    if (err) setAdminError(err);
+    setBusy(false);
+  };
+
+  const onScale = async (photo: Photo, next: number) => {
+    setBusy(true);
+    setAdminError(null);
+    const err = await setDisplayScale(photo, next);
     if (err) setAdminError(err);
     setBusy(false);
   };
@@ -407,8 +474,8 @@ export function Gallery({
 
         {editing ? (
           <p className="mb-6 font-brand text-sm text-fog">
-            Edit mode: use ↑ ↓ on a photo to rearrange this room, ✕ to delete.
-            Upload from the bar below.
+            Edit mode: ↑ ↓ rearrange · − + resize (keeps proportions) · ✕ delete.
+            A soft warning appears if the file is smaller than the display size.
           </p>
         ) : null}
         {adminError ? (
@@ -432,6 +499,7 @@ export function Gallery({
                 busy={busy}
                 onMove={onMove}
                 onRemove={onRemove}
+                onScale={onScale}
               />
             ))}
           </div>

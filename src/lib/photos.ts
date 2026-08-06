@@ -16,7 +16,7 @@ export async function getPhotos(): Promise<Photo[]> {
     const { data, error } = await supabase
       .from("photos")
       .select(
-        "id, title, storage_path, public_url, categories, night_kind, sort_order",
+        "id, title, storage_path, public_url, categories, night_kind, sort_order, display_scale",
       )
       .order("sort_order", { ascending: true });
 

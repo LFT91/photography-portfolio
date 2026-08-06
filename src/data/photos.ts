@@ -15,6 +15,8 @@ export type Photo = {
   categories: PhotoCategory[];
   sortOrder?: number;
   storagePath?: string;
+  /** Gallery tile width relative to column (1 = full). Keeps aspect ratio. */
+  displayScale?: number;
 };
 
 /** Work gallery filters — After Dark is a separate project. */

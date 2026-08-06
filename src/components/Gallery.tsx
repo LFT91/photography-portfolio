@@ -304,25 +304,27 @@ export function Gallery({
               <div />
             )}
             {showFilters && !lockedCategory ? (
-              <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-3 md:w-auto md:justify-end">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => selectFilter(category)}
-                    className={`font-brand text-sm tracking-[0.08em] transition-colors ${
-                      filter === category
-                        ? "text-paper"
-                        : "text-fog hover:text-paper-dim"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
+              <div className="flex w-full flex-col gap-4 md:w-auto md:flex-row md:items-center md:justify-end md:gap-x-8">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:gap-x-6">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => selectFilter(category)}
+                      className={`font-brand text-sm tracking-[0.08em] transition-colors ${
+                        filter === category
+                          ? "text-paper"
+                          : "text-fog hover:text-paper-dim"
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
                 {highlightAfterDark ? (
                   <Link
                     href="/after-dark"
-                    className="font-brand ml-auto text-sm tracking-[0.08em] text-ember transition-colors hover:text-[#e0c08a] md:ml-8"
+                    className="font-brand w-full text-center text-sm tracking-[0.08em] text-ember transition-colors hover:text-[#e0c08a] md:w-auto md:text-left"
                   >
                     After Dark
                   </Link>

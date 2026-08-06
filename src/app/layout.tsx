@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
+import { BackToTop } from "@/components/BackToTop";
 import "./globals.css";
 
 const brand = Cormorant_Garamond({
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full bg-ink font-brand text-paper">
         <div className="grain" aria-hidden />
         {children}
+        <BackToTop />
       </body>
     </html>
   );

@@ -152,6 +152,12 @@ export const photos: Photo[] = [
     sortOrder: 23,
   },
   {
+    src: "/images/nature/volcanic-peaks.jpg",
+    title: "Volcanic Peaks",
+    categories: ["Nature"],
+    sortOrder: 24,
+  },
+  {
     src: "/images/image_6483441.JPG",
     title: "Architecture",
     categories: ["Urban"],
@@ -192,6 +198,24 @@ export const photos: Photo[] = [
     title: "Window Grid",
     categories: ["Urban"],
     sortOrder: 32,
+  },
+  {
+    src: "/images/urban/westminster-cyclist.jpg",
+    title: "Westminster Cyclist",
+    categories: ["Urban"],
+    sortOrder: 33,
+  },
+  {
+    src: "/images/urban/snow-street.jpg",
+    title: "Snow Street",
+    categories: ["Urban"],
+    sortOrder: 34,
+  },
+  {
+    src: "/images/urban/bus-reflection.jpg",
+    title: "Bus Reflection",
+    categories: ["Urban"],
+    sortOrder: 35,
   },
   {
     src: "/images/image_6483441-2.JPG",
@@ -258,6 +282,12 @@ export const photos: Photo[] = [
     title: "Star Trails",
     categories: ["Astro"],
     sortOrder: 44,
+  },
+  {
+    src: "/images/astro/tower-star-trails.jpg",
+    title: "Tower Star Trails",
+    categories: ["Astro"],
+    sortOrder: 45,
   },
   {
     src: "/images/after-dark/FIRE50edit.jpg",

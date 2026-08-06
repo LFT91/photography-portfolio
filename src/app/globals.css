@@ -157,8 +157,12 @@ body {
   transform: scale(1.015);
 }
 
-/* Keep photos fully visible while admin is grabbing / resizing */
-.gallery-item.is-editing:hover img,
+/* Keep gallery tiles visible while admin is editing (no entrance fade hiding them). */
+.gallery-item.is-editing {
+  opacity: 1;
+  transform: none;
+}
+
 .gallery-item.is-editing img {
   transform: none;
   filter: none;

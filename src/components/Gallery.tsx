@@ -184,7 +184,62 @@ function Lightbox({
 }
 
 function clampScale(n: number) {
-  return Math.round(Math.min(1.35, Math.max(0.45, n)) * 100) / 100;
+  // Max 100% of the column so enlarging pushes neighbours instead of overlapping them.
+  return Math.round(Math.min(1, Math.max(0.45, n)) * 100) / 100;
+}
+
+type ResizeEdge =
+  | "left"
+  | "right"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right";
+
+function resizeDelta(edge: ResizeEdge, dx: number, dy: number, colW: number) {
+  switch (edge) {
+    case "left":
+      return -dx / colW;
+    case "right":
+      return dx / colW;
+    case "top-left":
+      return (-dx - dy) / 2 / colW;
+    case "top-right":
+      return (dx - dy) / 2 / colW;
+    case "bottom-left":
+      return (-dx + dy) / 2 / colW;
+    case "bottom-right":
+      return (dx + dy) / 2 / colW;
+  }
+}
+
+function ResizeHandle({
+  edge,
+  cursor,
+  className,
+  label,
+  scalePct,
+  onResize,
+}: {
+  edge: ResizeEdge;
+  cursor: string;
+  className: string;
+  label: string;
+  scalePct: number;
+  onResize: (edge: ResizeEdge, e: ReactPointerEvent) => void;
+}) {
+  return (
+    <div
+      role="slider"
+      aria-label={label}
+      aria-valuemin={45}
+      aria-valuemax={100}
+      aria-valuenow={scalePct}
+      tabIndex={0}
+      onPointerDown={(e) => onResize(edge, e)}
+      className={`absolute z-20 touch-none ${cursor} ${className}`}
+    />
+  );
 }
 
 function GalleryUploadZone({
@@ -291,7 +346,7 @@ function GalleryCard({
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const [soft, setSoft] = useState(false);
-  const savedScale = photo.displayScale ?? 1;
+  const savedScale = clampScale(photo.displayScale ?? 1);
   const [liveScale, setLiveScale] = useState(savedScale);
   const liveScaleRef = useRef(savedScale);
   const resizingRef = useRef(false);
@@ -341,7 +396,7 @@ function GalleryCard({
     };
   }, [photo.src, liveScale]);
 
-  const startResize = (edge: "left" | "right", e: ReactPointerEvent) => {
+  const startResize = (edge: ResizeEdge, e: ReactPointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (busy || !ref.current) return;
@@ -351,14 +406,15 @@ function GalleryCard({
 
     resizingRef.current = true;
     const startX = e.clientX;
+    const startY = e.clientY;
     const startScale = liveScaleRef.current;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
     const onPtrMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
-      const signed = edge === "right" ? dx : -dx;
-      const next = clampScale(startScale + signed / colW);
+      const dy = ev.clientY - startY;
+      const next = clampScale(startScale + resizeDelta(edge, dx, dy, colW));
       liveScaleRef.current = next;
       setLiveScale(next);
     };
@@ -377,6 +433,8 @@ function GalleryCard({
     target.addEventListener("pointerup", onUp);
     target.addEventListener("pointercancel", onUp);
   };
+
+  const scalePct = Math.round(liveScale * 100);
 
   return (
     <div
@@ -416,132 +474,161 @@ function GalleryCard({
           : undefined
       }
     >
-      <div
-        ref={imgWrapRef}
-        className="relative mx-auto bg-ink-soft"
-        style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
-      >
+      <div className="w-full">
         <div
-          className="relative w-full overflow-hidden"
+          ref={imgWrapRef}
+          className={`relative mx-auto bg-ink-soft ${
+            editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
+          }`}
+          style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
+          draggable={editing && !busy}
+          onDragStart={
+            editing
+              ? (e) => {
+                  if (resizingRef.current) {
+                    e.preventDefault();
+                    return;
+                  }
+                  e.dataTransfer.setData("text/photo-index", String(index));
+                  e.dataTransfer.effectAllowed = "move";
+                  const card = ref.current;
+                  if (card) {
+                    requestAnimationFrame(() => {
+                      card.style.opacity = "1";
+                    });
+                  }
+                }
+              : undefined
+          }
+          onDoubleClick={
+            editing
+              ? (e) => {
+                  e.preventDefault();
+                  if (Math.abs(liveScale - 1) < 0.01) return;
+                  setLiveScale(1);
+                  liveScaleRef.current = 1;
+                  onScale(photo, 1);
+                }
+              : undefined
+          }
           onContextMenu={(e) => e.preventDefault()}
+          title={
+            editing ? "Drag to move · double-click resets to 100%" : undefined
+          }
         >
-          {editing ? (
-            <ProtectedImage
-              src={photo.src}
-              alt={photo.title}
-              width={1600}
-              height={1200}
-              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="h-auto w-full"
-              style={{ width: "100%", height: "auto" }}
-              draggable={false}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => onOpen(photo)}
-              onContextMenu={(e) => e.preventDefault()}
-              className="block w-full overflow-hidden text-left"
-            >
+          <div className="relative w-full overflow-hidden">
+            {editing ? (
               <ProtectedImage
                 src={photo.src}
                 alt={photo.title}
                 width={1600}
                 height={1200}
                 sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                className="h-auto w-full"
+                className="pointer-events-none h-auto w-full"
                 style={{ width: "100%", height: "auto" }}
                 draggable={false}
               />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
-                <p className="font-display text-xl italic text-paper">
-                  {photo.title}
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpen(photo)}
+                onContextMenu={(e) => e.preventDefault()}
+                className="block w-full overflow-hidden text-left"
+              >
+                <ProtectedImage
+                  src={photo.src}
+                  alt={photo.title}
+                  width={1600}
+                  height={1200}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="h-auto w-full"
+                  style={{ width: "100%", height: "auto" }}
+                  draggable={false}
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+                  <p className="font-display text-xl italic text-paper">
+                    {photo.title}
+                  </p>
+                  <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+                    {photo.categories.join(" · ")}
+                  </p>
+                </div>
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <>
+              <ResizeHandle
+                edge="left"
+                cursor="cursor-ew-resize"
+                className="top-3 bottom-3 left-0 w-3 sm:w-3.5"
+                label="Resize from left"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+              <ResizeHandle
+                edge="right"
+                cursor="cursor-ew-resize"
+                className="top-3 bottom-3 right-0 w-3 sm:w-3.5"
+                label="Resize from right"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+              <ResizeHandle
+                edge="top-left"
+                cursor="cursor-nwse-resize"
+                className="top-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
+                label="Resize from top-left"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+              <ResizeHandle
+                edge="top-right"
+                cursor="cursor-nesw-resize"
+                className="top-0 right-0 h-4 w-4 sm:h-5 sm:w-5"
+                label="Resize from top-right"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+              <ResizeHandle
+                edge="bottom-left"
+                cursor="cursor-nesw-resize"
+                className="bottom-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
+                label="Resize from bottom-left"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+              <ResizeHandle
+                edge="bottom-right"
+                cursor="cursor-nwse-resize"
+                className="right-0 bottom-0 h-4 w-4 sm:h-5 sm:w-5"
+                label="Resize from bottom-right"
+                scalePct={scalePct}
+                onResize={startResize}
+              />
+
+              <span className="pointer-events-none absolute top-0.5 left-0.5 h-2.5 w-2.5 border-t border-l border-paper/90" />
+              <span className="pointer-events-none absolute top-0.5 right-0.5 h-2.5 w-2.5 border-t border-r border-paper/90" />
+              <span className="pointer-events-none absolute bottom-0.5 left-0.5 h-2.5 w-2.5 border-b border-l border-paper/90" />
+              <span className="pointer-events-none absolute right-0.5 bottom-0.5 h-2.5 w-2.5 border-r border-b border-paper/90" />
+              <span className="pointer-events-none absolute top-1/2 left-0.5 h-8 w-1 -translate-y-1/2 rounded-full bg-paper/75" />
+              <span className="pointer-events-none absolute top-1/2 right-0.5 h-8 w-1 -translate-y-1/2 rounded-full bg-paper/75" />
+
+              {pending ? (
+                <p className="pointer-events-none absolute top-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember">
+                  New
                 </p>
-                <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-                  {photo.categories.join(" · ")}
-                </p>
-              </div>
-            </button>
-          )}
+              ) : null}
+            </>
+          ) : null}
+
+          {editing && soft ? (
+            <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90">
+              Soft — file is smaller than display
+            </p>
+          ) : null}
         </div>
-
-        {editing ? (
-          <>
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Drag to reorder"
-              draggable={!busy}
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/photo-index", String(index));
-                e.dataTransfer.effectAllowed = "move";
-                // Keep the photo fully visible while dragging (browsers often dim the source).
-                const card = ref.current;
-                if (card) {
-                  requestAnimationFrame(() => {
-                    card.style.opacity = "1";
-                  });
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowUp") onMove(index, -1);
-                if (e.key === "ArrowDown") onMove(index, 1);
-              }}
-              className="absolute top-2 left-1/2 z-10 -translate-x-1/2 cursor-grab select-none border border-line bg-ink/70 px-2.5 py-1 font-brand text-xs tracking-[0.12em] text-paper active:cursor-grabbing"
-            >
-              ⋮⋮ move
-            </div>
-
-            <div
-              role="slider"
-              aria-label="Shrink or enlarge from left"
-              aria-valuemin={45}
-              aria-valuemax={135}
-              aria-valuenow={Math.round(liveScale * 100)}
-              tabIndex={0}
-              onPointerDown={(e) => startResize("left", e)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowLeft") onScale(photo, liveScale + 0.05);
-                if (e.key === "ArrowRight") onScale(photo, liveScale - 0.05);
-              }}
-              className="absolute top-0 bottom-0 left-0 z-10 w-3 cursor-ew-resize touch-none sm:w-4"
-            >
-              <span className="pointer-events-none absolute top-1/2 left-0.5 flex h-10 w-1.5 -translate-y-1/2 items-center justify-center rounded-full bg-paper/80 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]">
-                <span className="text-[8px] leading-none text-ink">◂</span>
-              </span>
-            </div>
-            <div
-              role="slider"
-              aria-label="Shrink or enlarge from right"
-              aria-valuemin={45}
-              aria-valuemax={135}
-              aria-valuenow={Math.round(liveScale * 100)}
-              tabIndex={0}
-              onPointerDown={(e) => startResize("right", e)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight") onScale(photo, liveScale + 0.05);
-                if (e.key === "ArrowLeft") onScale(photo, liveScale - 0.05);
-              }}
-              className="absolute top-0 bottom-0 right-0 z-10 w-3 cursor-ew-resize touch-none sm:w-4"
-            >
-              <span className="pointer-events-none absolute top-1/2 right-0.5 flex h-10 w-1.5 -translate-y-1/2 items-center justify-center rounded-full bg-paper/80 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]">
-                <span className="text-[8px] leading-none text-ink">▸</span>
-              </span>
-            </div>
-
-            {pending ? (
-              <p className="pointer-events-none absolute top-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember backdrop-blur-sm">
-                New
-              </p>
-            ) : null}
-          </>
-        ) : null}
-
-        {editing && soft ? (
-          <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90 backdrop-blur-sm">
-            Soft — file is smaller than display
-          </p>
-        ) : null}
       </div>
 
       {editing ? (
@@ -574,7 +661,7 @@ function GalleryCard({
               ↓
             </button>
             <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
-              {Math.round(liveScale * 100)}%
+              {scalePct}%
             </span>
             <button
               type="button"
@@ -749,9 +836,9 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Edit on this page: rename under each photo · drag side handles to
-              resize · <span className="text-paper-dim">⋮⋮ move</span> to
-              reorder · ✕ to stage delete. Save or Cancel in the bar below.
+              Drag a photo to reorder · drag edges or corners to resize (max
+              full column) · double-click resets to 100% · edit the title · ✕
+              stages delete. Save or Cancel below.
             </p>
           </>
         ) : null}

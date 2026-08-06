@@ -224,6 +224,63 @@ function useGalleryLayout() {
   return { cols, baseCellWidth, galleryRef };
 }
 
+/** Scroll the page while dragging near the top/bottom edge. */
+function useDragAutoScroll(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const edge = 72;
+    const maxStep = 28;
+    let frame = 0;
+    let velocity = 0;
+
+    const tick = () => {
+      if (velocity !== 0) {
+        window.scrollBy(0, velocity);
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+
+    const onDragOver = (e: DragEvent) => {
+      // Required so drops keep working while scrolling.
+      e.preventDefault();
+      const y = e.clientY;
+      const h = window.innerHeight;
+      if (y < edge) {
+        velocity = -maxStep * (1 - y / edge);
+      } else if (y > h - edge) {
+        velocity = maxStep * (1 - (h - y) / edge);
+      } else {
+        velocity = 0;
+      }
+    };
+
+    const stop = () => {
+      velocity = 0;
+      document.body.classList.remove("is-gallery-dragging");
+    };
+
+    const onDragStart = () => {
+      document.body.classList.add("is-gallery-dragging");
+    };
+
+    window.addEventListener("dragstart", onDragStart, true);
+    window.addEventListener("dragover", onDragOver, true);
+    window.addEventListener("dragend", stop, true);
+    window.addEventListener("drop", stop, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      stop();
+      window.removeEventListener("dragstart", onDragStart, true);
+      window.removeEventListener("dragover", onDragOver, true);
+      window.removeEventListener("dragend", stop, true);
+      window.removeEventListener("drop", stop, true);
+    };
+  }, [enabled]);
+}
+
 type ResizeEdge =
   | "left"
   | "right"
@@ -541,16 +598,37 @@ function GalleryCard({
                   }
                   e.dataTransfer.setData("text/photo-key", photoKey(photo));
                   e.dataTransfer.effectAllowed = "move";
-                  // Avoid browser default dimming the source mid-drag.
-                  e.currentTarget.classList.add("opacity-100");
+                  const card = ref.current;
+                  card?.classList.add("is-drag-source");
+                  // Custom ghost so the browser doesn't blank the real tile.
+                  const ghost = card?.cloneNode(true) as HTMLElement | null;
+                  if (ghost) {
+                    ghost.style.position = "absolute";
+                    ghost.style.top = "-9999px";
+                    ghost.style.left = "-9999px";
+                    ghost.style.width = `${card?.offsetWidth ?? 200}px`;
+                    ghost.style.opacity = "0.9";
+                    ghost.style.pointerEvents = "none";
+                    document.body.appendChild(ghost);
+                    e.dataTransfer.setDragImage(
+                      ghost,
+                      Math.min(40, (card?.offsetWidth ?? 80) / 4),
+                      24,
+                    );
+                    requestAnimationFrame(() => ghost.remove());
+                  }
                 }
               : undefined
           }
           onDragEnd={
             editing
-              ? (e) => {
-                  e.currentTarget.classList.remove("opacity-100");
-                  ref.current?.classList.remove("ring-1", "ring-ember/70");
+              ? () => {
+                  ref.current?.classList.remove(
+                    "is-drag-source",
+                    "ring-1",
+                    "ring-ember/70",
+                  );
+                  document.body.classList.remove("is-gallery-dragging");
                 }
               : undefined
           }
@@ -827,6 +905,7 @@ export function Gallery({
     setViewOrder,
   } = useAdmin();
   const { cols, baseCellWidth, galleryRef } = useGalleryLayout();
+  useDragAutoScroll(editing);
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],

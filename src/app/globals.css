@@ -158,15 +158,28 @@ body {
 }
 
 /* Keep gallery tiles visible while admin is editing (no entrance fade hiding them). */
-.gallery-item.is-editing {
-  opacity: 1;
-  transform: none;
+.gallery-item.is-editing,
+body.is-gallery-dragging .gallery-item.is-editing {
+  opacity: 1 !important;
+  transform: none !important;
 }
 
-.gallery-item.is-editing img {
-  transform: none;
-  filter: none;
-  opacity: 1;
+.gallery-item.is-editing img,
+.gallery-item.is-editing .protect-media,
+body.is-gallery-dragging .gallery-item.is-editing img {
+  transform: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.gallery-item.is-drag-source {
+  opacity: 0.55 !important;
+}
+
+.gallery-item.is-drag-source img,
+.gallery-item.is-drag-source .protect-media {
+  opacity: 1 !important;
 }
 
 @keyframes lightbox-in {

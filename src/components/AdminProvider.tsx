@@ -51,7 +51,7 @@ function draftIsDirty(draft: EditDraft) {
 }
 
 function clampScale(n: number) {
-  return Math.round(Math.min(1, Math.max(0.45, n)) * 100) / 100;
+  return Math.round(Math.min(3, Math.max(0.45, n)) * 100) / 100;
 }
 
 export function applyDraftToList(

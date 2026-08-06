@@ -80,11 +80,7 @@ export function AdminPanel() {
 
   return (
     <div className="mx-auto max-w-md px-5 py-16 sm:px-8 sm:py-24">
-      <h1 className="font-display text-4xl italic text-paper">Admin sign in</h1>
-      <p className="mt-3 font-brand text-sm text-paper-dim">
-        After you sign in, you&apos;ll land on the live site with edit controls
-        on the photos.
-      </p>
+      <h1 className="font-display text-4xl italic text-paper">Admin</h1>
       <form onSubmit={signIn} className="mt-10 space-y-5">
         <label className="block">
           <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
@@ -118,7 +114,7 @@ export function AdminPanel() {
           disabled={busy}
           className="w-full border border-ember px-4 py-3 font-brand text-sm tracking-[0.08em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-50"
         >
-          {busy ? "Signing in…" : "Sign in & edit site"}
+          {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

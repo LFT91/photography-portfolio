@@ -439,7 +439,7 @@ function GalleryCard({
   return (
     <div
       ref={ref}
-      className={`gallery-item group relative mb-3 w-full break-inside-avoid md:mb-4 ${
+      className={`gallery-item group relative w-full ${
         editing ? "is-editing" : ""
       } ${dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""} ${
         pending ? "opacity-90" : ""
@@ -477,7 +477,7 @@ function GalleryCard({
       <div className="w-full">
         <div
           ref={imgWrapRef}
-          className={`relative mx-auto bg-ink-soft ${
+          className={`relative bg-ink-soft ${
             editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
           }`}
           style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
@@ -512,9 +512,6 @@ function GalleryCard({
               : undefined
           }
           onContextMenu={(e) => e.preventDefault()}
-          title={
-            editing ? "Drag to move · double-click resets to 100%" : undefined
-          }
         >
           <div className="relative w-full overflow-hidden">
             {editing ? (
@@ -836,9 +833,10 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag a photo to reorder · drag edges or corners to resize (max
-              full column) · double-click resets to 100% · edit the title · ✕
-              stages delete. Save or Cancel below.
+              Drag a photo to reorder · edges/corners resize · double-click
+              resets to 100% · edit title below · ✕ stages delete. Photos keep
+              even spacing and reflow until you place them. Save or Cancel
+              below.
             </p>
           </>
         ) : null}
@@ -851,7 +849,7 @@ export function Gallery({
             No photos in this section yet.
           </p>
         ) : (
-          <div className="columns-1 gap-3 md:columns-2 md:gap-4 lg:columns-3">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {filtered.map((photo, index) => (
               <GalleryCard
                 key={photo.id ?? photo.src}

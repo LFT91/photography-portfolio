@@ -1,3 +1,5 @@
+import { photoOrientationRank } from "@/lib/photo-orientation";
+
 export type PhotoCategory =
   | "Nature"
   | "Urban"
@@ -549,7 +551,11 @@ export function photoInCategory(photo: Photo, category: PhotoCategory) {
 
 export const afterDarkPhotos = photos
   .filter((photo) => photoInCategory(photo, "After Dark"))
-  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  .sort((a, b) => {
+    const byShape = photoOrientationRank(a.src) - photoOrientationRank(b.src);
+    if (byShape !== 0) return byShape;
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  });
 
 export const afterDarkCover =
   photos.find((photo) => photo.src.includes("after-dark-cover")) ??

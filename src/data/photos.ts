@@ -218,6 +218,12 @@ export const photos: Photo[] = [
     sortOrder: 35,
   },
   {
+    src: "/images/urban/fortnum-night.jpg",
+    title: "Fortnum Night",
+    categories: ["Urban"],
+    sortOrder: 36,
+  },
+  {
     src: "/images/image_6483441-2.JPG",
     title: "Northern Lights",
     categories: ["Astro"],

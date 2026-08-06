@@ -244,7 +244,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/650CD8F4-159E-4E17-BF66-985E8DD1F47E.jpg",
     title: "Star Road",
-    categories: ["Astro"],
+    categories: ["After Dark"],
     sortOrder: 36,
   },
   {
@@ -516,7 +516,55 @@ export const photos: Photo[] = [
     title: "Troubadour",
     categories: ["After Dark"],
     sortOrder: 81,
-  }
+  },
+  {
+    src: "/images/monochrome/spiral-stairs.jpg",
+    title: "Spiral Stairs",
+    categories: ["Monochrome"],
+    sortOrder: 82,
+  },
+  {
+    src: "/images/monochrome/contortionist.jpg",
+    title: "Contortionist",
+    categories: ["Monochrome"],
+    sortOrder: 83,
+  },
+  {
+    src: "/images/monochrome/one-poultry.jpg",
+    title: "One Poultry",
+    categories: ["Monochrome"],
+    sortOrder: 84,
+  },
+  {
+    src: "/images/monochrome/light-beams.jpg",
+    title: "Light Beams",
+    categories: ["Monochrome"],
+    sortOrder: 85,
+  },
+  {
+    src: "/images/monochrome/stair-light.jpg",
+    title: "Stair Light",
+    categories: ["Monochrome"],
+    sortOrder: 86,
+  },
+  {
+    src: "/images/monochrome/millipede-spiral.jpg",
+    title: "Millipede Spiral",
+    categories: ["Monochrome"],
+    sortOrder: 87,
+  },
+  {
+    src: "/images/monochrome/blindfold-piano.jpg",
+    title: "Blindfold Piano",
+    categories: ["Monochrome"],
+    sortOrder: 88,
+  },
+  {
+    src: "/images/monochrome/afternoon-rest.jpg",
+    title: "Afternoon Rest",
+    categories: ["Monochrome"],
+    sortOrder: 89,
+  },
 ];
 
 export function photoInCategory(photo: Photo, category: PhotoCategory) {

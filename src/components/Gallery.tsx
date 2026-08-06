@@ -61,7 +61,7 @@ function Lightbox({
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-50 flex flex-col bg-ink/95 backdrop-blur-sm"
+      className="animate-fade fixed inset-0 z-[80] flex flex-col bg-ink/95 backdrop-blur-sm"
       onClick={() => {
         if (didSwipe.current) {
           didSwipe.current = false;
@@ -449,6 +449,7 @@ function GalleryCard({
   const [liveScale, setLiveScale] = useState(savedScale);
   const liveScaleRef = useRef(savedScale);
   const resizingRef = useRef(false);
+  const openClickTimer = useRef<number | null>(null);
   const pending = Boolean(photo.id?.startsWith("pending:"));
 
   useEffect(() => {
@@ -632,10 +633,29 @@ function GalleryCard({
                 }
               : undefined
           }
+          onClick={
+            editing
+              ? () => {
+                  if (resizingRef.current) return;
+                  if (openClickTimer.current)
+                    window.clearTimeout(openClickTimer.current);
+                  // Delay so double-click can reset size without opening.
+                  openClickTimer.current = window.setTimeout(() => {
+                    openClickTimer.current = null;
+                    onOpen(photo);
+                  }, 220);
+                }
+              : undefined
+          }
           onDoubleClick={
             editing
               ? (e) => {
                   e.preventDefault();
+                  e.stopPropagation();
+                  if (openClickTimer.current) {
+                    window.clearTimeout(openClickTimer.current);
+                    openClickTimer.current = null;
+                  }
                   if (Math.abs(liveScale - 1) < 0.01) return;
                   setLiveScale(1);
                   liveScaleRef.current = 1;
@@ -1091,7 +1111,7 @@ export function Gallery({
         )}
       </div>
 
-      {activeIndex != null && !editing ? (
+      {activeIndex != null ? (
         <Lightbox
           items={filtered}
           index={activeIndex}

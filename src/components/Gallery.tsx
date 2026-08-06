@@ -183,9 +183,9 @@ function Lightbox({
   );
 }
 
-/** Absolute layout ceiling: 3× a base column ≈ full row on desktop. */
+/** Scale is relative to one grid cell (100% = full column). */
 const SCALE_MIN = 0.45;
-const SCALE_LAYOUT_MAX = 3;
+const SCALE_LAYOUT_MAX = 1;
 
 function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
   return Math.round(Math.min(max, Math.max(SCALE_MIN, n)) * 100) / 100;
@@ -478,10 +478,6 @@ function GalleryCard({
 
   const scalePct = Math.round(liveScale * 100);
   const scalePctMax = Math.round(SCALE_LAYOUT_MAX * 100);
-  const tileWidth =
-    baseCellWidth > 0
-      ? `min(100%, ${Math.round(baseCellWidth * liveScale * 10) / 10}px)`
-      : `${Math.round(liveScale * 1000) / 10}%`;
   const col = index % cols;
   const row = Math.floor(index / cols);
   const canLeft = col > 0;
@@ -492,13 +488,11 @@ function GalleryCard({
   return (
     <div
       ref={ref}
-      className={`gallery-item group relative shrink-0 ${
+      className={`gallery-item group relative w-full min-w-0 ${
         editing ? "is-editing" : ""
       } ${pending ? "opacity-90" : ""}`}
       style={{
         transitionDelay: `${(index % 6) * 60}ms`,
-        width: tileWidth,
-        maxWidth: "100%",
       }}
       onDragOver={
         editing
@@ -533,9 +527,10 @@ function GalleryCard({
       <div className="w-full">
         <div
           ref={imgWrapRef}
-          className={`relative w-full bg-ink-soft ${
+          className={`relative mx-auto bg-ink-soft ${
             editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
           }`}
+          style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
           draggable={editing && !busy}
           onDragStart={
             editing
@@ -976,9 +971,9 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag to reorder · edges/corners resize freely · double-click
-              resets to 100% · edit title · ✕ stages delete. Save or Cancel
-              below.
+              Drag to reorder · ←↑↓→ swap on the grid · loupe or handles to
+              resize within a cell · double-click resets to 100% · ✕ stages
+              delete. Save or Cancel below.
             </p>
           </>
         ) : null}
@@ -993,7 +988,7 @@ export function Gallery({
         ) : (
           <div
             ref={galleryRef}
-            className="flex flex-wrap content-start items-start gap-3 sm:gap-4"
+            className="grid grid-cols-1 items-start gap-3 sm:grid-cols-3 sm:gap-4"
           >
             {filtered.map((photo, index) => (
               <GalleryCard

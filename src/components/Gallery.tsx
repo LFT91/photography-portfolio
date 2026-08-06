@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAdmin } from "@/components/AdminProvider";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import {
+  applyDraftToList,
+  useAdmin,
+} from "@/components/AdminProvider";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import {
   categories,
@@ -128,7 +137,6 @@ function Lightbox({
           </>
         ) : null}
 
-        {/* pointer-events-none so dark space around the photo still closes */}
         <div className="pointer-events-none flex w-full max-w-6xl flex-col">
           <div
             key={photo.src}
@@ -155,7 +163,6 @@ function Lightbox({
         </div>
       </div>
 
-      {/* Prefetch neighbours for instant stepping */}
       {total > 1 ? (
         <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden>
           <ProtectedImage
@@ -176,6 +183,82 @@ function Lightbox({
   );
 }
 
+function clampScale(n: number) {
+  return Math.round(Math.min(1.35, Math.max(0.45, n)) * 100) / 100;
+}
+
+function GalleryUploadZone({
+  room,
+  onError,
+}: {
+  room: PhotoCategory;
+  onError: (msg: string | null) => void;
+}) {
+  const { queueUpload, saving } = useAdmin();
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addFiles = (list: FileList | null) => {
+    if (!list?.length) return;
+    onError(null);
+    for (const file of Array.from(list)) {
+      const err = queueUpload(file, [room]);
+      if (err) {
+        onError(err);
+        break;
+      }
+    }
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="mb-8">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        onChange={(e) => addFiles(e.target.files)}
+      />
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => inputRef.current?.click()}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          addFiles(e.dataTransfer.files);
+        }}
+        className={`flex w-full flex-col items-center justify-center gap-2 border border-dashed px-4 py-10 text-center transition-colors disabled:opacity-50 ${
+          dragOver
+            ? "border-ember bg-ember/10 text-ember"
+            : "border-line text-paper-dim hover:border-fog hover:text-paper"
+        }`}
+      >
+        <span className="font-brand text-sm tracking-[0.06em]">
+          Drop photos here, or click to add to {room}
+        </span>
+        <span className="font-brand text-xs text-fog">
+          Staged until you Save below
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function GalleryCard({
   photo,
   index,
@@ -186,6 +269,10 @@ function GalleryCard({
   onMove,
   onRemove,
   onScale,
+  onTitle,
+  onDropAt,
+  dragOver,
+  onDragHover,
 }: {
   photo: Photo;
   index: number;
@@ -196,11 +283,25 @@ function GalleryCard({
   onMove: (from: number, direction: -1 | 1) => void;
   onRemove: (photo: Photo) => void;
   onScale: (photo: Photo, next: number) => void;
+  onTitle: (photo: Photo, title: string) => void;
+  onDropAt: (from: number, to: number) => void;
+  dragOver: boolean;
+  onDragHover: (index: number | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const [soft, setSoft] = useState(false);
-  const scale = photo.displayScale ?? 1;
+  const savedScale = photo.displayScale ?? 1;
+  const [liveScale, setLiveScale] = useState(savedScale);
+  const liveScaleRef = useRef(savedScale);
+  const resizingRef = useRef(false);
+  const pending = Boolean(photo.id?.startsWith("pending:"));
+
+  useEffect(() => {
+    if (resizingRef.current) return;
+    setLiveScale(savedScale);
+    liveScaleRef.current = savedScale;
+  }, [savedScale]);
 
   useEffect(() => {
     const el = ref.current;
@@ -238,24 +339,93 @@ function GalleryCard({
       img.removeEventListener("load", check);
       window.removeEventListener("resize", check);
     };
-  }, [photo.src, scale]);
+  }, [photo.src, liveScale]);
+
+  const startResize = (edge: "left" | "right", e: ReactPointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy || !ref.current) return;
+
+    const colW = ref.current.clientWidth;
+    if (colW <= 0) return;
+
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startScale = liveScaleRef.current;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+
+    const onPtrMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const signed = edge === "right" ? dx : -dx;
+      const next = clampScale(startScale + signed / colW);
+      liveScaleRef.current = next;
+      setLiveScale(next);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      target.releasePointerCapture(ev.pointerId);
+      target.removeEventListener("pointermove", onPtrMove);
+      target.removeEventListener("pointerup", onUp);
+      target.removeEventListener("pointercancel", onUp);
+      resizingRef.current = false;
+      const next = liveScaleRef.current;
+      if (Math.abs(next - savedScale) >= 0.01) onScale(photo, next);
+    };
+
+    target.addEventListener("pointermove", onPtrMove);
+    target.addEventListener("pointerup", onUp);
+    target.addEventListener("pointercancel", onUp);
+  };
 
   return (
     <div
       ref={ref}
-      className="gallery-item group relative mb-3 w-full break-inside-avoid md:mb-4"
+      className={`gallery-item group relative mb-3 w-full break-inside-avoid md:mb-4 ${
+        dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""
+      } ${pending ? "opacity-90" : ""}`}
       style={{ transitionDelay: `${(index % 6) * 60}ms` }}
+      onDragOver={
+        editing
+          ? (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              onDragHover(index);
+            }
+          : undefined
+      }
+      onDragLeave={
+        editing
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                onDragHover(null);
+              }
+            }
+          : undefined
+      }
+      onDrop={
+        editing
+          ? (e) => {
+              e.preventDefault();
+              onDragHover(null);
+              const from = Number(e.dataTransfer.getData("text/photo-index"));
+              if (Number.isFinite(from) && from !== index) onDropAt(from, index);
+            }
+          : undefined
+      }
     >
       <div
         ref={imgWrapRef}
-        className="relative mx-auto overflow-hidden bg-ink-soft"
-        style={{ width: `${Math.round(scale * 1000) / 10}%` }}
+        className="relative mx-auto bg-ink-soft"
+        style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
       >
         <button
           type="button"
-          onClick={() => onOpen(photo)}
+          onClick={() => {
+            if (!editing) onOpen(photo);
+          }}
           onContextMenu={(e) => e.preventDefault()}
-          className="block w-full text-left"
+          className="block w-full overflow-hidden text-left"
         >
           <ProtectedImage
             src={photo.src}
@@ -265,14 +435,82 @@ function GalleryCard({
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="h-auto w-full"
             style={{ width: "100%", height: "auto" }}
+            draggable={false}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
-            <p className="font-display text-xl italic text-paper">{photo.title}</p>
-            <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-              {photo.categories.join(" · ")}
-            </p>
-          </div>
+          {!editing ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+              <p className="font-display text-xl italic text-paper">{photo.title}</p>
+              <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+                {photo.categories.join(" · ")}
+              </p>
+            </div>
+          ) : null}
         </button>
+
+        {editing ? (
+          <>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Drag to reorder"
+              draggable={!busy}
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/photo-index", String(index));
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp") onMove(index, -1);
+                if (e.key === "ArrowDown") onMove(index, 1);
+              }}
+              className="absolute top-2 left-1/2 z-10 -translate-x-1/2 cursor-grab select-none border border-line bg-ink/85 px-2.5 py-1 font-brand text-xs tracking-[0.12em] text-paper backdrop-blur-sm active:cursor-grabbing"
+            >
+              ⋮⋮ move
+            </div>
+
+            <div
+              role="slider"
+              aria-label="Shrink or enlarge from left"
+              aria-valuemin={45}
+              aria-valuemax={135}
+              aria-valuenow={Math.round(liveScale * 100)}
+              tabIndex={0}
+              onPointerDown={(e) => startResize("left", e)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") onScale(photo, liveScale + 0.05);
+                if (e.key === "ArrowRight") onScale(photo, liveScale - 0.05);
+              }}
+              className="absolute top-0 bottom-0 left-0 z-10 w-3 cursor-ew-resize touch-none sm:w-4"
+            >
+              <span className="pointer-events-none absolute top-1/2 left-0.5 flex h-10 w-1.5 -translate-y-1/2 items-center justify-center rounded-full bg-paper/80 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]">
+                <span className="text-[8px] leading-none text-ink">◂</span>
+              </span>
+            </div>
+            <div
+              role="slider"
+              aria-label="Shrink or enlarge from right"
+              aria-valuemin={45}
+              aria-valuemax={135}
+              aria-valuenow={Math.round(liveScale * 100)}
+              tabIndex={0}
+              onPointerDown={(e) => startResize("right", e)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight") onScale(photo, liveScale + 0.05);
+                if (e.key === "ArrowLeft") onScale(photo, liveScale - 0.05);
+              }}
+              className="absolute top-0 bottom-0 right-0 z-10 w-3 cursor-ew-resize touch-none sm:w-4"
+            >
+              <span className="pointer-events-none absolute top-1/2 right-0.5 flex h-10 w-1.5 -translate-y-1/2 items-center justify-center rounded-full bg-paper/80 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]">
+                <span className="text-[8px] leading-none text-ink">▸</span>
+              </span>
+            </div>
+
+            {pending ? (
+              <p className="pointer-events-none absolute top-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember backdrop-blur-sm">
+                New
+              </p>
+            ) : null}
+          </>
+        ) : null}
 
         {editing && soft ? (
           <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90 backdrop-blur-sm">
@@ -282,55 +520,47 @@ function GalleryCard({
       </div>
 
       {editing ? (
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
-          <button
-            type="button"
-            disabled={busy || index === 0}
-            onClick={() => onMove(index, -1)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-            aria-label="Move earlier"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            disabled={busy || index >= total - 1}
-            onClick={() => onMove(index, 1)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-            aria-label="Move later"
-          >
-            ↓
-          </button>
-          <button
-            type="button"
-            disabled={busy || scale <= 0.45}
-            onClick={() => onScale(photo, scale - 0.05)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-            aria-label="Shrink"
-          >
-            −
-          </button>
-          <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            type="button"
-            disabled={busy || scale >= 1.35}
-            onClick={() => onScale(photo, scale + 0.05)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-            aria-label="Enlarge"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            disabled={busy || !photo.id}
-            onClick={() => onRemove(photo)}
-            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember disabled:opacity-30"
-            aria-label="Delete photo"
-          >
-            ✕
-          </button>
+        <div className="mt-2 space-y-2">
+          <input
+            type="text"
+            value={photo.title}
+            disabled={busy}
+            onChange={(e) => onTitle(photo, e.target.value)}
+            aria-label="Photo title"
+            className="w-full border border-line bg-transparent px-3 py-2 font-display text-lg italic text-paper outline-none focus:border-ember disabled:opacity-50"
+          />
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            <button
+              type="button"
+              disabled={busy || index === 0}
+              onClick={() => onMove(index, -1)}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+              aria-label="Move earlier"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              disabled={busy || index >= total - 1}
+              onClick={() => onMove(index, 1)}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+              aria-label="Move later"
+            >
+              ↓
+            </button>
+            <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
+              {Math.round(liveScale * 100)}%
+            </span>
+            <button
+              type="button"
+              disabled={busy || !photo.id}
+              onClick={() => onRemove(photo)}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember disabled:opacity-30"
+              aria-label="Delete photo"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -355,20 +585,29 @@ export function Gallery({
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
 }) {
-  const { editing, movePhoto, removePhoto, setDisplayScale } = useAdmin();
+  const {
+    editing,
+    draft,
+    saving,
+    setPhotoTitle,
+    setPhotoScale,
+    markDeleted,
+    setViewOrder,
+  } = useAdmin();
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
   );
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const room = lockedCategory ?? filter;
 
   const filtered = useMemo(() => {
-    const activeCategory = lockedCategory ?? filter;
-    const list = source.filter((p) => photoInCategory(p, activeCategory));
-    return [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  }, [filter, lockedCategory, source]);
+    const list = source.filter((p) => photoInCategory(p, room));
+    return applyDraftToList(list, room, draft);
+  }, [draft, room, source]);
 
   const selectFilter = (category: PhotoCategory) => {
     setFilter(category);
@@ -380,33 +619,42 @@ export function Gallery({
     if (i >= 0) setActiveIndex(i);
   };
 
-  const onMove = async (from: number, direction: -1 | 1) => {
+  const onMove = (from: number, direction: -1 | 1) => {
     const to = from + direction;
-    const a = filtered[from];
-    const b = filtered[to];
-    if (!a || !b) return;
-    setBusy(true);
-    setAdminError(null);
-    const err = await movePhoto(a, b);
-    if (err) setAdminError(err);
-    setBusy(false);
+    if (to < 0 || to >= filtered.length) return;
+    const next = [...filtered];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setViewOrder(room, next);
   };
 
-  const onRemove = async (photo: Photo) => {
-    if (!window.confirm(`Remove “${photo.title}” from the site?`)) return;
-    setBusy(true);
-    setAdminError(null);
-    const err = await removePhoto(photo);
-    if (err) setAdminError(err);
-    setBusy(false);
+  const onDropAt = (from: number, to: number) => {
+    setDragOverIndex(null);
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= filtered.length ||
+      to >= filtered.length
+    )
+      return;
+    const next = [...filtered];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setViewOrder(room, next);
   };
 
-  const onScale = async (photo: Photo, next: number) => {
-    setBusy(true);
-    setAdminError(null);
-    const err = await setDisplayScale(photo, next);
-    if (err) setAdminError(err);
-    setBusy(false);
+  const onRemove = (photo: Photo) => {
+    if (!window.confirm(`Remove “${photo.title}”? (Save to confirm)`)) return;
+    markDeleted(photo);
+  };
+
+  const onScale = (photo: Photo, next: number) => {
+    setPhotoScale(photo, next);
+  };
+
+  const onTitle = (photo: Photo, next: string) => {
+    setPhotoTitle(photo, next);
   };
 
   const showHeader =
@@ -473,10 +721,14 @@ export function Gallery({
         ) : null}
 
         {editing ? (
-          <p className="mb-6 font-brand text-sm text-fog">
-            Edit mode: ↑ ↓ rearrange · − + resize (keeps proportions) · ✕ delete.
-            A soft warning appears if the file is smaller than the display size.
-          </p>
+          <>
+            <GalleryUploadZone room={room} onError={setAdminError} />
+            <p className="mb-6 font-brand text-sm text-fog">
+              Edit on this page: rename under each photo · drag side handles to
+              resize · <span className="text-paper-dim">⋮⋮ move</span> to
+              reorder · ✕ to stage delete. Save or Cancel in the bar below.
+            </p>
+          </>
         ) : null}
         {adminError ? (
           <p className="mb-6 font-brand text-sm text-ember">{adminError}</p>
@@ -496,17 +748,21 @@ export function Gallery({
                 total={filtered.length}
                 onOpen={openPhoto}
                 editing={editing}
-                busy={busy}
+                busy={saving}
                 onMove={onMove}
                 onRemove={onRemove}
                 onScale={onScale}
+                onTitle={onTitle}
+                onDropAt={onDropAt}
+                dragOver={dragOverIndex === index}
+                onDragHover={setDragOverIndex}
               />
             ))}
           </div>
         )}
       </div>
 
-      {activeIndex != null ? (
+      {activeIndex != null && !editing ? (
         <Lightbox
           items={filtered}
           index={activeIndex}
@@ -517,4 +773,3 @@ export function Gallery({
     </section>
   );
 }
-

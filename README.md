@@ -43,4 +43,4 @@ Add the same env vars in **Vercel → Project → Settings → Environment Varia
 2. In Vercel → **Settings → Domains** → add it.
 3. Follow Vercel’s DNS instructions at your registrar.
 
-Admin stays at `https://your-domain.com/admin` (not linked in the public nav).
+Admin stays at `https://your-domain.com/admin` (bookmark only — not linked on public pages).

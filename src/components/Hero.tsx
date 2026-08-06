@@ -43,13 +43,6 @@ export function Hero() {
           </Link>
         </div>
       </div>
-
-      <Link
-        href="/admin"
-        className="absolute bottom-4 left-5 z-10 font-brand text-[11px] tracking-[0.06em] text-white/30 transition-colors hover:text-white/55 sm:left-8"
-      >
-        admin access
-      </Link>
     </section>
   );
 }

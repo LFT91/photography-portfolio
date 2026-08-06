@@ -14,17 +14,9 @@ export function Footer() {
             Fatni Photography
           </span>
         </Link>
-        <div className="flex flex-col gap-2 sm:items-end">
-          <p className="text-sm text-fog">
-            © {new Date().getFullYear()} Fatni Photography. All rights reserved.
-          </p>
-          <Link
-            href="/admin"
-            className="font-brand text-[11px] tracking-[0.06em] text-fog/45 transition-colors hover:text-fog/80"
-          >
-            admin access
-          </Link>
-        </div>
+        <p className="text-sm text-fog sm:text-right">
+          © {new Date().getFullYear()} Fatni Photography. All rights reserved.
+        </p>
       </div>
     </footer>
   );

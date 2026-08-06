@@ -5,11 +5,11 @@ export const photoOrientations: Record<string, PhotoOrientation> = {
   "/images/coastal-cove.jpg": "landscape", // 1024x682
   "/images/trees.jpeg": "landscape", // 2048x1639
   "/images/A7303942-Edit2.jpg": "portrait", // 2702x3376
-  "/images/after-dark/1322EAC0-7E67-47C5-8FC4-6A8D285E561C.jpg": "portrait", // 1366x2049
-  "/images/after-dark/5F0A7A9B-056C-4494-A5B2-9670B3596602.jpg": "portrait", // 1366x2049
-  "/images/after-dark/7E7A53E3-49A2-4BAA-8967-255434470242.jpg": "portrait", // 4000x6000
-  "/images/after-dark/DABA4D9F-F725-4871-ADF1-33567E2253C0.jpg": "portrait", // 2400x3000
-  "/images/after-dark/IMG_5539-1.jpg": "portrait", // 1366x2049
+  "/images/nature/coastal-moon.jpg": "portrait", // 1366x2049
+  "/images/nature/arch-view.jpg": "portrait", // 1366x2049
+  "/images/nature/sea-stacks.jpg": "portrait", // 4000x6000
+  "/images/nature/ice-shore.jpg": "portrait", // 2400x3000
+  "/images/nature/hillside-lights.jpg": "portrait", // 1366x2049
   "/images/travel/alpine-church.jpg": "portrait", // 682x1024
   "/images/travel/mountain-village.jpg": "landscape", // 1024x682
   "/images/travel/palm-beach.jpg": "square", // 886x886

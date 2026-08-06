@@ -8,13 +8,13 @@ export function Contact() {
           <h1 className="max-w-xl font-display text-4xl italic text-paper sm:text-6xl">
             Get in touch
           </h1>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-paper-dim">
+          <p className="mt-6 max-w-md text-base leading-relaxed text-paper/85">
             For inquiries, collaborations, or print requests, email me or use
             the form.
           </p>
           <a
             href="mailto:photo.ae@pm.me"
-            className="mt-8 inline-flex border-b border-paper/40 pb-1 font-brand text-base tracking-[0.04em] text-paper transition-colors hover:border-ember hover:text-ember sm:text-lg"
+            className="mt-8 inline-flex border-b border-paper/55 pb-1 font-brand text-base tracking-[0.04em] text-paper transition-colors hover:border-ember hover:text-ember sm:text-lg"
           >
             photo.ae@pm.me
           </a>

@@ -1,14 +1,7 @@
 import { photos as staticPhotos, type Photo } from "@/data/photos";
 import { mapDbPhoto, type DbPhoto } from "@/lib/photo-map";
 
-/** Local catalog plus any newer uploads from Supabase (e.g. admin-only photos). */
-function mergeCatalog(dbPhotos: Photo[]): Photo[] {
-  const staticTitles = new Set(staticPhotos.map((p) => p.title));
-  const extras = dbPhotos.filter((p) => !staticTitles.has(p.title));
-  return [...staticPhotos, ...extras];
-}
-
-/** Prefer merged local+Supabase so the full site stays intact while migrating. */
+/** Supabase is source of truth when populated; otherwise local catalog. */
 export async function getPhotos(): Promise<Photo[]> {
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -31,7 +24,7 @@ export async function getPhotos(): Promise<Photo[]> {
       return staticPhotos;
     }
 
-    return mergeCatalog(data.map((row) => mapDbPhoto(row as DbPhoto)));
+    return data.map((row) => mapDbPhoto(row as DbPhoto));
   } catch {
     return staticPhotos;
   }

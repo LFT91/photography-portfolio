@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAdmin } from "@/components/AdminProvider";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import {
   categories,
@@ -10,7 +11,6 @@ import {
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
-import { photoOrientationRank } from "@/lib/photo-orientation";
 
 function Lightbox({
   items,
@@ -179,13 +179,23 @@ function Lightbox({
 function GalleryCard({
   photo,
   index,
+  total,
   onOpen,
+  editing,
+  busy,
+  onMove,
+  onRemove,
 }: {
   photo: Photo;
   index: number;
+  total: number;
   onOpen: (photo: Photo) => void;
+  editing: boolean;
+  busy: boolean;
+  onMove: (from: number, direction: -1 | 1) => void;
+  onRemove: (photo: Photo) => void;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -205,30 +215,66 @@ function GalleryCard({
   }, [photo.src]);
 
   return (
-    <button
+    <div
       ref={ref}
-      type="button"
-      onClick={() => onOpen(photo)}
-      onContextMenu={(e) => e.preventDefault()}
-      className="gallery-item group relative mb-3 w-full break-inside-avoid overflow-hidden bg-ink-soft text-left md:mb-4"
+      className="gallery-item group relative mb-3 w-full break-inside-avoid overflow-hidden bg-ink-soft md:mb-4"
       style={{ transitionDelay: `${(index % 6) * 60}ms` }}
     >
-      <ProtectedImage
-        src={photo.src}
-        alt={photo.title}
-        width={1600}
-        height={1200}
-        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        className="h-auto w-full"
-        style={{ width: "100%", height: "auto" }}
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100">
-        <p className="font-display text-xl italic text-paper">{photo.title}</p>
-        <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-          {photo.categories.join(" · ")}
-        </p>
-      </div>
-    </button>
+      <button
+        type="button"
+        onClick={() => onOpen(photo)}
+        onContextMenu={(e) => e.preventDefault()}
+        className="block w-full text-left"
+      >
+        <ProtectedImage
+          src={photo.src}
+          alt={photo.title}
+          width={1600}
+          height={1200}
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="h-auto w-full"
+          style={{ width: "100%", height: "auto" }}
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+          <p className="font-display text-xl italic text-paper">{photo.title}</p>
+          <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+            {photo.categories.join(" · ")}
+          </p>
+        </div>
+      </button>
+
+      {editing ? (
+        <div className="absolute top-2 right-2 z-10 flex gap-1">
+          <button
+            type="button"
+            disabled={busy || index === 0}
+            onClick={() => onMove(index, -1)}
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper backdrop-blur-sm disabled:opacity-30"
+            aria-label="Move earlier"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            disabled={busy || index >= total - 1}
+            onClick={() => onMove(index, 1)}
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper backdrop-blur-sm disabled:opacity-30"
+            aria-label="Move later"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            disabled={busy || !photo.id}
+            onClick={() => onRemove(photo)}
+            className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember backdrop-blur-sm disabled:opacity-30"
+            aria-label="Delete photo"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -250,21 +296,19 @@ export function Gallery({
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
 }) {
+  const { editing, movePhoto, removePhoto } = useAdmin();
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
   );
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const activeCategory = lockedCategory ?? filter;
     const list = source.filter((p) => photoInCategory(p, activeCategory));
-    return [...list].sort((a, b) => {
-      const byShape =
-        photoOrientationRank(a.src) - photoOrientationRank(b.src);
-      if (byShape !== 0) return byShape;
-      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-    });
+    return [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [filter, lockedCategory, source]);
 
   const selectFilter = (category: PhotoCategory) => {
@@ -277,6 +321,27 @@ export function Gallery({
     if (i >= 0) setActiveIndex(i);
   };
 
+  const onMove = async (from: number, direction: -1 | 1) => {
+    const to = from + direction;
+    const a = filtered[from];
+    const b = filtered[to];
+    if (!a || !b) return;
+    setBusy(true);
+    setAdminError(null);
+    const err = await movePhoto(a, b);
+    if (err) setAdminError(err);
+    setBusy(false);
+  };
+
+  const onRemove = async (photo: Photo) => {
+    if (!window.confirm(`Remove “${photo.title}” from the site?`)) return;
+    setBusy(true);
+    setAdminError(null);
+    const err = await removePhoto(photo);
+    if (err) setAdminError(err);
+    setBusy(false);
+  };
+
   const showHeader =
     Boolean(title) || (showFilters && !lockedCategory) || highlightAfterDark;
 
@@ -284,7 +349,7 @@ export function Gallery({
     <section
       className={`relative bg-ink px-5 pb-16 sm:px-8 sm:pb-24 ${
         tightTop ? "pt-6 sm:pt-8" : "pt-10 sm:pt-14"
-      }`}
+      } ${editing ? "pb-28 sm:pb-32" : ""}`}
     >
       <div className="mx-auto max-w-7xl">
         {showHeader ? (
@@ -340,6 +405,16 @@ export function Gallery({
           </div>
         ) : null}
 
+        {editing ? (
+          <p className="mb-6 font-brand text-sm text-fog">
+            Edit mode: use ↑ ↓ on a photo to rearrange this room, ✕ to delete.
+            Upload from the bar below.
+          </p>
+        ) : null}
+        {adminError ? (
+          <p className="mb-6 font-brand text-sm text-ember">{adminError}</p>
+        ) : null}
+
         {filtered.length === 0 ? (
           <p className="font-brand text-paper-dim">
             No photos in this section yet.
@@ -348,10 +423,15 @@ export function Gallery({
           <div className="columns-1 gap-3 md:columns-2 md:gap-4 lg:columns-3">
             {filtered.map((photo, index) => (
               <GalleryCard
-                key={photo.src}
+                key={photo.id ?? photo.src}
                 photo={photo}
                 index={index}
+                total={filtered.length}
                 onOpen={openPhoto}
+                editing={editing}
+                busy={busy}
+                onMove={onMove}
+                onRemove={onRemove}
               />
             ))}
           </div>
@@ -369,3 +449,4 @@ export function Gallery({
     </section>
   );
 }
+

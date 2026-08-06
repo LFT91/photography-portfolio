@@ -340,7 +340,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/piccadilly-run.jpg",
     title: "Piccadilly Run",
-    categories: ["After Dark"],
+    categories: ["Street"],
     sortOrder: 59,
   },
   {

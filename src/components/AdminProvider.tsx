@@ -235,7 +235,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const setEditing = useCallback(
     (value: boolean) => {
       if (!value && dirty) {
-        const ok = window.confirm("Discard unsaved changes?");
+        const ok = window.confirm("Discard all unsaved edits?");
         if (!ok) return;
         discardDraft();
       }

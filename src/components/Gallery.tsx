@@ -450,7 +450,21 @@ function GalleryCard({
   const liveScaleRef = useRef(savedScale);
   const resizingRef = useRef(false);
   const openClickTimer = useRef<number | null>(null);
+  const suppressOpenRef = useRef(false);
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
   const pending = Boolean(photo.id?.startsWith("pending:"));
+
+  const clearOpenTimer = () => {
+    if (openClickTimer.current) {
+      window.clearTimeout(openClickTimer.current);
+      openClickTimer.current = null;
+    }
+  };
+
+  const markInteraction = () => {
+    suppressOpenRef.current = true;
+    clearOpenTimer();
+  };
 
   useEffect(() => {
     if (resizingRef.current) return;
@@ -502,6 +516,7 @@ function GalleryCard({
     e.stopPropagation();
     if (busy || baseCellWidth <= 0) return;
 
+    markInteraction();
     resizingRef.current = true;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -510,6 +525,7 @@ function GalleryCard({
     target.setPointerCapture(e.pointerId);
 
     const onPtrMove = (ev: PointerEvent) => {
+      markInteraction();
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       const next = clampScale(
@@ -525,6 +541,11 @@ function GalleryCard({
       target.removeEventListener("pointerup", onUp);
       target.removeEventListener("pointercancel", onUp);
       resizingRef.current = false;
+      // Keep suppress through the synthetic click that follows pointerup.
+      markInteraction();
+      window.setTimeout(() => {
+        suppressOpenRef.current = false;
+      }, 0);
       const next = liveScaleRef.current;
       if (Math.abs(next - savedScale) >= 0.01) onScale(photo, next);
     };
@@ -590,6 +611,41 @@ function GalleryCard({
           }`}
           style={{ width: `${Math.round(liveScale * 1000) / 10}%` }}
           draggable={editing && !busy}
+          onPointerDown={
+            editing
+              ? (e) => {
+                  if (e.button !== 0) return;
+                  pointerDownRef.current = { x: e.clientX, y: e.clientY };
+                  suppressOpenRef.current = false;
+                }
+              : undefined
+          }
+          onPointerMove={
+            editing
+              ? (e) => {
+                  const start = pointerDownRef.current;
+                  if (!start || suppressOpenRef.current) return;
+                  const dx = e.clientX - start.x;
+                  const dy = e.clientY - start.y;
+                  if (dx * dx + dy * dy > 25) markInteraction();
+                }
+              : undefined
+          }
+          onPointerUp={
+            editing
+              ? () => {
+                  pointerDownRef.current = null;
+                }
+              : undefined
+          }
+          onPointerCancel={
+            editing
+              ? () => {
+                  pointerDownRef.current = null;
+                  markInteraction();
+                }
+              : undefined
+          }
           onDragStart={
             editing
               ? (e) => {
@@ -597,11 +653,11 @@ function GalleryCard({
                     e.preventDefault();
                     return;
                   }
+                  markInteraction();
                   e.dataTransfer.setData("text/photo-key", photoKey(photo));
                   e.dataTransfer.effectAllowed = "move";
                   const card = ref.current;
                   card?.classList.add("is-drag-source");
-                  // Custom ghost so the browser doesn't blank the real tile.
                   const ghost = card?.cloneNode(true) as HTMLElement | null;
                   if (ghost) {
                     ghost.style.position = "absolute";
@@ -624,24 +680,33 @@ function GalleryCard({
           onDragEnd={
             editing
               ? () => {
+                  markInteraction();
                   ref.current?.classList.remove(
                     "is-drag-source",
                     "ring-1",
                     "ring-ember/70",
                   );
                   document.body.classList.remove("is-gallery-dragging");
+                  window.setTimeout(() => {
+                    suppressOpenRef.current = false;
+                  }, 0);
                 }
               : undefined
           }
           onClick={
             editing
-              ? () => {
-                  if (resizingRef.current) return;
-                  if (openClickTimer.current)
-                    window.clearTimeout(openClickTimer.current);
+              ? (e) => {
+                  e.stopPropagation();
+                  if (suppressOpenRef.current || resizingRef.current) {
+                    suppressOpenRef.current = false;
+                    clearOpenTimer();
+                    return;
+                  }
+                  clearOpenTimer();
                   // Delay so double-click can reset size without opening.
                   openClickTimer.current = window.setTimeout(() => {
                     openClickTimer.current = null;
+                    if (suppressOpenRef.current) return;
                     onOpen(photo);
                   }, 220);
                 }
@@ -652,10 +717,11 @@ function GalleryCard({
               ? (e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (openClickTimer.current) {
-                    window.clearTimeout(openClickTimer.current);
-                    openClickTimer.current = null;
-                  }
+                  clearOpenTimer();
+                  markInteraction();
+                  window.setTimeout(() => {
+                    suppressOpenRef.current = false;
+                  }, 0);
                   if (Math.abs(liveScale - 1) < 0.01) return;
                   setLiveScale(1);
                   liveScaleRef.current = 1;

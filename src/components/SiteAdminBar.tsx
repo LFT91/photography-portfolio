@@ -19,20 +19,13 @@ export function SiteAdminBar() {
   if (!ready || !user) return null;
 
   const onCancel = () => {
-    if (!dirty) {
-      setEditing(false);
-      return;
-    }
-    if (window.confirm("Discard all unsaved edits?")) {
-      discardDraft();
-    }
+    if (dirty && !window.confirm("Discard all unsaved edits?")) return;
+    if (dirty) discardDraft();
+    setEditing(false);
   };
 
   const onSave = async () => {
-    const err = await saveDraft();
-    if (!err) {
-      // stay in edit mode so you can keep going; draft is clear
-    }
+    await saveDraft();
   };
 
   return (
@@ -58,7 +51,7 @@ export function SiteAdminBar() {
               <>
                 <button
                   type="button"
-                  disabled={!dirty || saving}
+                  disabled={saving}
                   onClick={onCancel}
                   className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper disabled:opacity-40"
                 >
@@ -71,14 +64,6 @@ export function SiteAdminBar() {
                   className="border border-ember px-3 py-2 font-brand text-sm text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
                 >
                   {saving ? "Saving…" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setEditing(false)}
-                  className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper disabled:opacity-40"
-                >
-                  Done
                 </button>
               </>
             )}
@@ -98,7 +83,7 @@ export function SiteAdminBar() {
         ) : null}
         {editing && dirty && !saveError ? (
           <p className="mx-auto mt-2 max-w-7xl font-brand text-sm text-fog">
-            Changes stay local until you Save. Cancel reverts everything.
+            Changes stay local until you Save. Cancel discards and exits edit.
           </p>
         ) : null}
       </div>

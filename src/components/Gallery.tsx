@@ -10,6 +10,7 @@ import {
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
+import { photoOrientationRank } from "@/lib/photo-orientation";
 
 function Lightbox({
   items,
@@ -258,7 +259,12 @@ export function Gallery({
   const filtered = useMemo(() => {
     const activeCategory = lockedCategory ?? filter;
     const list = source.filter((p) => photoInCategory(p, activeCategory));
-    return [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return [...list].sort((a, b) => {
+      const byShape =
+        photoOrientationRank(a.src) - photoOrientationRank(b.src);
+      if (byShape !== 0) return byShape;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
   }, [filter, lockedCategory, source]);
 
   const selectFilter = (category: PhotoCategory) => {

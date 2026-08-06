@@ -32,7 +32,7 @@ export function AfterDark({
             fill
             priority
             sizes="100vw"
-            className="pointer-events-none object-contain object-center"
+            className="pointer-events-none object-cover object-center scale-105"
           />
         </div>
 

@@ -24,6 +24,7 @@ type AdminContextValue = {
   uploadPhoto: (file: File, title: string, categories: PhotoCategory[]) => Promise<string | null>;
   removePhoto: (photo: Photo) => Promise<string | null>;
   movePhoto: (a: Photo, b: Photo) => Promise<string | null>;
+  setDisplayScale: (photo: Photo, scale: number) => Promise<string | null>;
   refresh: () => void;
 };
 
@@ -115,6 +116,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         categories,
         night_kind: null,
         sort_order: maxSort + 1,
+        display_scale: 1,
       });
       if (insertError) return insertError.message;
 
@@ -159,6 +161,21 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [supabase, refresh],
   );
 
+  const setDisplayScale = useCallback(
+    async (photo: Photo, scale: number) => {
+      if (!supabase || !photo.id) return "Missing photo id.";
+      const next = Math.round(Math.min(1.35, Math.max(0.45, scale)) * 100) / 100;
+      const { error } = await supabase
+        .from("photos")
+        .update({ display_scale: next })
+        .eq("id", photo.id);
+      if (error) return error.message;
+      refresh();
+      return null;
+    },
+    [supabase, refresh],
+  );
+
   const value = useMemo(
     () => ({
       ready,
@@ -170,6 +187,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       uploadPhoto,
       removePhoto,
       movePhoto,
+      setDisplayScale,
       refresh,
     }),
     [
@@ -181,6 +199,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       uploadPhoto,
       removePhoto,
       movePhoto,
+      setDisplayScale,
       refresh,
     ],
   );

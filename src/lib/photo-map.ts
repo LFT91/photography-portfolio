@@ -8,6 +8,7 @@ export type DbPhoto = {
   categories: string[];
   night_kind: string | null;
   sort_order: number;
+  display_scale?: number | null;
 };
 
 export function mapDbPhoto(row: DbPhoto): Photo {
@@ -18,5 +19,6 @@ export function mapDbPhoto(row: DbPhoto): Photo {
     categories: row.categories as PhotoCategory[],
     sortOrder: row.sort_order,
     storagePath: row.storage_path,
+    displayScale: row.display_scale ?? 1,
   };
 }

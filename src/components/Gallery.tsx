@@ -364,6 +364,7 @@ function GalleryCard({
   editing,
   busy,
   baseCellWidth,
+  cols,
   onMove,
   onRemove,
   onScale,
@@ -377,7 +378,8 @@ function GalleryCard({
   editing: boolean;
   busy: boolean;
   baseCellWidth: number;
-  onMove: (from: number, direction: -1 | 1) => void;
+  cols: number;
+  onMove: (from: number, dir: "up" | "down" | "left" | "right") => void;
   onRemove: (photo: Photo) => void;
   onScale: (photo: Photo, next: number) => void;
   onTitle: (photo: Photo, title: string) => void;
@@ -480,6 +482,12 @@ function GalleryCard({
     baseCellWidth > 0
       ? `min(100%, ${Math.round(baseCellWidth * liveScale * 10) / 10}px)`
       : `${Math.round(liveScale * 1000) / 10}%`;
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  const canLeft = col > 0;
+  const canRight = col < cols - 1 && index + 1 < total;
+  const canUp = row > 0;
+  const canDown = index + cols < total;
 
   return (
     <div
@@ -698,21 +706,39 @@ function GalleryCard({
           <div className="flex flex-wrap items-center justify-center gap-1">
             <button
               type="button"
-              disabled={busy || index === 0}
-              onClick={() => onMove(index, -1)}
+              disabled={busy || !canLeft}
+              onClick={() => onMove(index, "left")}
               className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Move earlier"
+              aria-label="Swap with photo on the left"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canUp}
+              onClick={() => onMove(index, "up")}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+              aria-label="Swap with photo above"
             >
               ↑
             </button>
             <button
               type="button"
-              disabled={busy || index >= total - 1}
-              onClick={() => onMove(index, 1)}
+              disabled={busy || !canDown}
+              onClick={() => onMove(index, "down")}
               className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Move later"
+              aria-label="Swap with photo below"
             >
               ↓
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canRight}
+              onClick={() => onMove(index, "right")}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
+              aria-label="Swap with photo on the right"
+            >
+              →
             </button>
             <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
               {scalePct}%
@@ -760,7 +786,7 @@ export function Gallery({
     markDeleted,
     setViewOrder,
   } = useAdmin();
-  const { baseCellWidth, galleryRef } = useGalleryLayout();
+  const { cols, baseCellWidth, galleryRef } = useGalleryLayout();
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
@@ -785,12 +811,30 @@ export function Gallery({
     if (i >= 0) setActiveIndex(i);
   };
 
-  const onMove = (from: number, direction: -1 | 1) => {
-    const to = from + direction;
-    if (to < 0 || to >= filtered.length) return;
+  const onMove = (from: number, dir: "up" | "down" | "left" | "right") => {
+    const col = from % cols;
+    const row = Math.floor(from / cols);
+    let to = from;
+    if (dir === "left") {
+      if (col === 0) return;
+      to = from - 1;
+    } else if (dir === "right") {
+      if (col >= cols - 1 || from + 1 >= filtered.length) return;
+      to = from + 1;
+    } else if (dir === "up") {
+      if (row === 0) return;
+      to = from - cols;
+    } else if (dir === "down") {
+      to = from + cols;
+      if (to >= filtered.length) return;
+    }
+    if (to === from || to < 0 || to >= filtered.length) return;
     const next = [...filtered];
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
+    const a = next[from];
+    const b = next[to];
+    if (!a || !b) return;
+    next[from] = b;
+    next[to] = a;
     setViewOrder(room, next);
   };
 
@@ -916,6 +960,7 @@ export function Gallery({
                 editing={editing}
                 busy={saving}
                 baseCellWidth={baseCellWidth}
+                cols={cols}
                 onMove={onMove}
                 onRemove={onRemove}
                 onScale={onScale}

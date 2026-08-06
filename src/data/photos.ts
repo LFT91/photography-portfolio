@@ -339,8 +339,8 @@ export const photos: Photo[] = [
   },
   {
     src: "/images/after-dark/2F2E8CA6-A1DB-44ED-8879-E56955B99845.jpg",
-    title: "After Dark 09",
-    categories: ["Street"],
+    title: "Night Corner",
+    categories: ["Urban"],
     sortOrder: 53,
   },
   {
@@ -430,7 +430,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/moulin-rouge.jpg",
     title: "Moulin Rouge",
-    categories: ["Street"],
+    categories: ["Urban"],
     sortOrder: 70,
   },
   {
@@ -448,7 +448,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/fog-brake-lights.jpg",
     title: "Fog Brake Lights",
-    categories: ["Street"],
+    categories: ["Urban"],
     sortOrder: 73,
   },
   {
@@ -478,7 +478,7 @@ export const photos: Photo[] = [
   {
     src: "/images/after-dark/fog-station-pass.jpg",
     title: "Fog Station Pass",
-    categories: ["Street"],
+    categories: ["Urban"],
     sortOrder: 78,
   },
   {

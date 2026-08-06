@@ -4,8 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  nightKinds,
-  type NightKind,
+  categories as workCategories,
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
@@ -13,7 +12,10 @@ import { mapDbPhoto, type DbPhoto } from "@/lib/photo-map";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-const ALL_CATEGORIES: PhotoCategory[] = ["Travel", "Street", "Night"];
+const ALL_CATEGORIES: PhotoCategory[] = [
+  ...workCategories,
+  "After Dark",
+];
 
 export function AdminPanel() {
   const configured = hasSupabaseEnv();
@@ -28,9 +30,8 @@ export function AdminPanel() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<PhotoCategory[]>([
-    "Travel",
+    "Nature",
   ]);
-  const [nightKind, setNightKind] = useState<NightKind>("Atmosphere");
 
   const supabase = useMemo(
     () => (configured ? createClient() : null),
@@ -141,13 +142,12 @@ export function AdminPanel() {
       data: { publicUrl },
     } = supabase.storage.from("photos").getPublicUrl(path);
 
-    const includesNight = selectedCategories.includes("Night");
     const { error: insertError } = await supabase.from("photos").insert({
       title: title.trim(),
       storage_path: path,
       public_url: publicUrl,
       categories: selectedCategories,
-      night_kind: includesNight ? nightKind : null,
+      night_kind: null,
       sort_order: maxSort + 1,
     });
 
@@ -159,8 +159,7 @@ export function AdminPanel() {
 
     setTitle("");
     setFile(null);
-    setSelectedCategories(["Travel"]);
-    setNightKind("Atmosphere");
+    setSelectedCategories(["Nature"]);
     await loadPhotos();
     setBusy(false);
   };
@@ -368,24 +367,6 @@ export function AdminPanel() {
             ))}
           </div>
         </fieldset>
-        {selectedCategories.includes("Night") ? (
-          <label className="block">
-            <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
-              After Dark kind
-            </span>
-            <select
-              value={nightKind}
-              onChange={(e) => setNightKind(e.target.value as NightKind)}
-              className="mt-2 w-full border border-line bg-ink px-4 py-3 font-brand text-paper outline-none focus:border-ember"
-            >
-              {nightKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
         {error ? (
           <p className="font-brand text-sm text-ember">{error}</p>
         ) : null}
@@ -403,7 +384,7 @@ export function AdminPanel() {
           Library ({photos.length})
         </h2>
         <p className="mt-2 font-brand text-sm text-fog">
-          Use ↑ ↓ to reorder. Order drives Travel, Street, and After Dark.
+          Use ↑ ↓ to reorder across Nature, Architecture, Astro, Street, Monochrome, and After Dark.
         </p>
         <ul className="mt-8 space-y-4">
           {photos.map((photo, index) => (
@@ -424,7 +405,6 @@ export function AdminPanel() {
                 <p className="truncate font-brand text-paper">{photo.title}</p>
                 <p className="mt-1 font-brand text-xs text-fog">
                   {photo.categories.join(" · ")}
-                  {photo.nightKind ? ` · ${photo.nightKind}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2">

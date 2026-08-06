@@ -31,7 +31,7 @@ export function Hero() {
           Fatni Photography
         </h1>
         <p className="animate-rise delay-2 mx-auto mt-5 max-w-md text-base leading-relaxed text-white/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-lg">
-          Travel, street, and night photography.
+          Nature, street, architecture, and night.
         </p>
         <div className="animate-rise delay-3 mt-10 sm:mt-12">
           <Link

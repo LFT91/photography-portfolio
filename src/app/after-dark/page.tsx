@@ -1,29 +1,32 @@
 import type { Metadata } from "next";
 import { AfterDark } from "@/components/AfterDark";
 import { Header } from "@/components/Header";
-import { afterDarkCover } from "@/data/photos";
+import { afterDarkCover, afterDarkPhotos } from "@/data/photos";
 import { getPhotos } from "@/lib/photos";
 
 export const metadata: Metadata = {
   title: "After Dark | Fatni Photography",
   description:
-    "The quiet hours of night — nightscapes, starscapes, and streets after dark.",
+    "Fog, rain, and the quiet hours — a project on how life looks after dark.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function AfterDarkPage() {
   const photos = await getPhotos();
+  const project = photos.filter((photo) =>
+    photo.categories.includes("After Dark"),
+  );
+  const items = project.length ? project : afterDarkPhotos;
   const cover =
-    photos.find((photo) => photo.src.includes("after-dark-cover")) ??
-    photos.find((photo) => photo.categories.includes("Night")) ??
+    items.find((photo) => photo.src.includes("after-dark-cover")) ??
     afterDarkCover;
 
   return (
     <>
       <Header />
       <main>
-        <AfterDark items={photos} cover={cover} />
+        <AfterDark items={items} cover={cover} />
       </main>
     </>
   );

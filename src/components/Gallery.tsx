@@ -5,10 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import {
   categories,
-  nightKinds,
-  photoInCategory,
   photos,
-  type NightKind,
+  photoInCategory,
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
@@ -63,7 +61,6 @@ function Lightbox({
             className="pointer-events-none object-contain"
             priority
           />
-          {/* Blocks right-click / long-press “Save image” on the photo */}
           <div className="absolute inset-0" aria-hidden />
         </div>
         <div className="mt-4 flex items-baseline justify-between gap-4">
@@ -156,34 +153,31 @@ export function Gallery({
   intro,
   lockedCategory,
   showFilters = true,
-  showNightFilters = false,
   tightTop = false,
   items,
+  highlightAfterDark = false,
 }: {
   title?: string;
   intro?: string;
   lockedCategory?: PhotoCategory;
   showFilters?: boolean;
-  showNightFilters?: boolean;
   tightTop?: boolean;
   items?: Photo[];
+  /** Show After Dark project link on the far right in ember. */
+  highlightAfterDark?: boolean;
 }) {
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
     lockedCategory ?? categories[0],
   );
-  const [nightFilter, setNightFilter] = useState<NightKind>(nightKinds[0]);
   const [page, setPage] = useState(1);
   const [active, setActive] = useState<Photo | null>(null);
 
   const filtered = useMemo(() => {
     const activeCategory = lockedCategory ?? filter;
-    let list = source.filter((p) => photoInCategory(p, activeCategory));
-    if (showNightFilters && activeCategory === "Night") {
-      list = list.filter((p) => p.nightKind === nightFilter);
-    }
+    const list = source.filter((p) => photoInCategory(p, activeCategory));
     return [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  }, [filter, lockedCategory, nightFilter, showNightFilters, source]);
+  }, [filter, lockedCategory, source]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -202,15 +196,8 @@ export function Gallery({
     setPage(1);
   };
 
-  const selectNightFilter = (kind: NightKind) => {
-    setNightFilter(kind);
-    setPage(1);
-  };
-
   const showHeader =
-    Boolean(title) ||
-    (showFilters && !lockedCategory) ||
-    showNightFilters;
+    Boolean(title) || (showFilters && !lockedCategory) || highlightAfterDark;
 
   return (
     <section
@@ -220,83 +207,71 @@ export function Gallery({
     >
       <div className="mx-auto max-w-7xl">
         {showHeader ? (
-        <div
-          className={`mb-14 flex flex-col gap-6 ${
-            (showFilters && !lockedCategory) || showNightFilters
-              ? "md:flex-row md:items-end md:justify-between"
-              : ""
-          }`}
-        >
-          {title ? (
-            <div>
-              <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
-                {title}
-              </h1>
-              {intro ? (
-                <p className="mt-4 max-w-lg font-brand text-base text-paper-dim sm:text-lg">
-                  {intro}
-                </p>
-              ) : null}
-            </div>
-          ) : <div />}
-          {showFilters && !lockedCategory ? (
-            <div className="flex flex-wrap gap-x-6 gap-y-3">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => selectFilter(category)}
-                  className={`font-brand text-sm tracking-[0.08em] transition-colors ${
-                    filter === category
-                      ? "text-paper"
-                      : "text-fog hover:text-paper-dim"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-              <Link
-                href="/after-dark"
-                className="font-brand text-sm tracking-[0.08em] text-fog transition-colors hover:text-paper"
-              >
-                After Dark
-              </Link>
-            </div>
-          ) : null}
-          {showNightFilters ? (
-            <div className="flex flex-wrap gap-x-6 gap-y-3">
-              {nightKinds.map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  onClick={() => selectNightFilter(kind)}
-                  className={`font-brand text-sm tracking-[0.08em] transition-colors ${
-                    nightFilter === kind
-                      ? "text-paper"
-                      : "text-fog hover:text-paper-dim"
-                  }`}
-                >
-                  {kind}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+          <div
+            className={`mb-14 flex flex-col gap-6 ${
+              showFilters && !lockedCategory
+                ? "md:flex-row md:items-end md:justify-between"
+                : ""
+            }`}
+          >
+            {title ? (
+              <div>
+                <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
+                  {title}
+                </h1>
+                {intro ? (
+                  <p className="mt-4 max-w-lg font-brand text-base text-paper-dim sm:text-lg">
+                    {intro}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div />
+            )}
+            {showFilters && !lockedCategory ? (
+              <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-3 md:w-auto md:justify-end">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => selectFilter(category)}
+                    className={`font-brand text-sm tracking-[0.08em] transition-colors ${
+                      filter === category
+                        ? "text-paper"
+                        : "text-fog hover:text-paper-dim"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+                {highlightAfterDark ? (
+                  <Link
+                    href="/after-dark"
+                    className="font-brand ml-auto text-sm tracking-[0.08em] text-ember transition-colors hover:text-[#e0c08a] md:ml-8"
+                  >
+                    After Dark
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {pagePhotos.length === 0 ? (
-          <p className="font-brand text-paper-dim">No photos in this section yet.</p>
+          <p className="font-brand text-paper-dim">
+            No photos in this section yet.
+          </p>
         ) : (
-        <div className="columns-1 gap-3 md:columns-2 md:gap-4 lg:columns-3">
-          {pagePhotos.map((photo, index) => (
-            <GalleryCard
-              key={`${photo.src}-${currentPage}`}
-              photo={photo}
-              index={index}
-              onOpen={setActive}
-            />
-          ))}
-        </div>
+          <div className="columns-1 gap-3 md:columns-2 md:gap-4 lg:columns-3">
+            {pagePhotos.map((photo, index) => (
+              <GalleryCard
+                key={`${photo.src}-${currentPage}`}
+                photo={photo}
+                index={index}
+                onOpen={setActive}
+              />
+            ))}
+          </div>
         )}
 
         {totalPages > 1 ? (

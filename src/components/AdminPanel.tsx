@@ -30,7 +30,7 @@ export function AdminPanel() {
   const [selectedCategories, setSelectedCategories] = useState<PhotoCategory[]>([
     "Travel",
   ]);
-  const [nightKind, setNightKind] = useState<NightKind>("Street");
+  const [nightKind, setNightKind] = useState<NightKind>("Atmosphere");
 
   const supabase = useMemo(
     () => (configured ? createClient() : null),
@@ -160,7 +160,7 @@ export function AdminPanel() {
     setTitle("");
     setFile(null);
     setSelectedCategories(["Travel"]);
-    setNightKind("Street");
+    setNightKind("Atmosphere");
     await loadPhotos();
     setBusy(false);
   };

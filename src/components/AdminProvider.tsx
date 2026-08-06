@@ -98,18 +98,26 @@ export function applyDraftToList(
     return combined.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }
 
-  const byId = new Map(
-    combined.filter((p) => p.id).map((p) => [p.id!, p] as const),
-  );
+  const keyOf = (p: Photo) => p.id || p.src;
+  const byKey = new Map(combined.map((p) => [keyOf(p), p] as const));
   const ordered: Photo[] = [];
-  for (const id of order) {
-    const photo = byId.get(id);
-    if (photo) {
+  const seen = new Set<string>();
+
+  for (const key of order) {
+    const photo = byKey.get(key);
+    if (photo && !seen.has(key)) {
       ordered.push(photo);
-      byId.delete(id);
+      seen.add(key);
     }
   }
-  for (const photo of byId.values()) ordered.push(photo);
+  // Never drop photos that weren't in the saved order list.
+  for (const photo of combined) {
+    const key = keyOf(photo);
+    if (!seen.has(key)) {
+      ordered.push(photo);
+      seen.add(key);
+    }
+  }
   return ordered;
 }
 
@@ -314,7 +322,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         ...d,
         orders: {
           ...d.orders,
-          [viewKey]: ordered.map((p) => p.id!).filter(Boolean),
+          [viewKey]: ordered.map((p) => p.id || p.src).filter(Boolean),
         },
       }));
     },

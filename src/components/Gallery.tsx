@@ -352,6 +352,10 @@ function GalleryUploadZone({
   );
 }
 
+function photoKey(photo: Photo) {
+  return photo.id || photo.src;
+}
+
 function GalleryCard({
   photo,
   index,
@@ -365,8 +369,6 @@ function GalleryCard({
   onScale,
   onTitle,
   onDropAt,
-  dragOver,
-  onDragHover,
 }: {
   photo: Photo;
   index: number;
@@ -379,9 +381,7 @@ function GalleryCard({
   onRemove: (photo: Photo) => void;
   onScale: (photo: Photo, next: number) => void;
   onTitle: (photo: Photo, title: string) => void;
-  onDropAt: (from: number, to: number) => void;
-  dragOver: boolean;
-  onDragHover: (index: number | null) => void;
+  onDropAt: (fromKey: string, toKey: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
@@ -486,9 +486,7 @@ function GalleryCard({
       ref={ref}
       className={`gallery-item group relative shrink-0 ${
         editing ? "is-editing" : ""
-      } ${dragOver ? "outline outline-1 outline-ember/70 outline-offset-2" : ""} ${
-        pending ? "opacity-90" : ""
-      }`}
+      } ${pending ? "opacity-90" : ""}`}
       style={{
         transitionDelay: `${(index % 6) * 60}ms`,
         width: tileWidth,
@@ -499,7 +497,7 @@ function GalleryCard({
           ? (e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
-              onDragHover(index);
+              e.currentTarget.classList.add("ring-1", "ring-ember/70");
             }
           : undefined
       }
@@ -507,7 +505,7 @@ function GalleryCard({
         editing
           ? (e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                onDragHover(null);
+                e.currentTarget.classList.remove("ring-1", "ring-ember/70");
               }
             }
           : undefined
@@ -516,9 +514,10 @@ function GalleryCard({
         editing
           ? (e) => {
               e.preventDefault();
-              onDragHover(null);
-              const from = Number(e.dataTransfer.getData("text/photo-index"));
-              if (Number.isFinite(from) && from !== index) onDropAt(from, index);
+              e.currentTarget.classList.remove("ring-1", "ring-ember/70");
+              const fromKey = e.dataTransfer.getData("text/photo-key");
+              const toKey = photoKey(photo);
+              if (fromKey && fromKey !== toKey) onDropAt(fromKey, toKey);
             }
           : undefined
       }
@@ -537,14 +536,18 @@ function GalleryCard({
                     e.preventDefault();
                     return;
                   }
-                  e.dataTransfer.setData("text/photo-index", String(index));
+                  e.dataTransfer.setData("text/photo-key", photoKey(photo));
                   e.dataTransfer.effectAllowed = "move";
-                  const card = ref.current;
-                  if (card) {
-                    requestAnimationFrame(() => {
-                      card.style.opacity = "1";
-                    });
-                  }
+                  // Avoid browser default dimming the source mid-drag.
+                  e.currentTarget.classList.add("opacity-100");
+                }
+              : undefined
+          }
+          onDragEnd={
+            editing
+              ? (e) => {
+                  e.currentTarget.classList.remove("opacity-100");
+                  ref.current?.classList.remove("ring-1", "ring-ember/70");
                 }
               : undefined
           }
@@ -764,7 +767,6 @@ export function Gallery({
   );
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const room = lockedCategory ?? filter;
 
@@ -792,19 +794,16 @@ export function Gallery({
     setViewOrder(room, next);
   };
 
-  const onDropAt = (from: number, to: number) => {
-    setDragOverIndex(null);
-    if (
-      from === to ||
-      from < 0 ||
-      to < 0 ||
-      from >= filtered.length ||
-      to >= filtered.length
-    )
-      return;
+  const onDropAt = (fromKey: string, toKey: string) => {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    const from = filtered.findIndex((p) => photoKey(p) === fromKey);
+    const to = filtered.findIndex((p) => photoKey(p) === toKey);
+    if (from < 0 || to < 0 || from === to) return;
     const next = [...filtered];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
+    // Keep every photo — never write a partial order.
+    if (next.length !== filtered.length) return;
     setViewOrder(room, next);
   };
 
@@ -922,8 +921,6 @@ export function Gallery({
                 onScale={onScale}
                 onTitle={onTitle}
                 onDropAt={onDropAt}
-                dragOver={dragOverIndex === index}
-                onDragHover={setDragOverIndex}
               />
             ))}
           </div>

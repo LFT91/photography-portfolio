@@ -14,6 +14,11 @@ export type Photo = {
   title: string;
   categories: PhotoCategory[];
   sortOrder?: number;
+  /**
+   * Independent order within each Fatni collection (from collection_photos).
+   * Used when filtering by category so multi-collection membership stays correct.
+   */
+  collectionOrders?: Partial<Record<PhotoCategory, number>>;
   storagePath?: string;
   /** Gallery tile width relative to column (1 = full). Keeps aspect ratio. */
   displayScale?: number;

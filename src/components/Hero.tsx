@@ -54,7 +54,7 @@ function AyoubHero({ cover }: { cover?: Photo | null }) {
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden bg-ink">
       {cover ? (
-        <div className="relative">
+        <div className="relative inline-flex">
           <ArtistStagePrint
             src={cover.src}
             alt=""
@@ -62,11 +62,10 @@ function AyoubHero({ cover }: { cover?: Photo | null }) {
             mode="height"
             blend="beams"
           />
-
-          {/* ENTER placement approved manually — do not reposition */}
+          {/* Anchored to the lit window bay on the façade print */}
           <Link
             href="/monochrome"
-            className="animate-rise delay-2 absolute bottom-[14%] left-[46%] z-10 inline-flex -translate-x-1/2 items-center gap-2 border border-white/50 bg-black/45 px-5 py-2.5 font-brand text-xs tracking-[0.16em] text-white/95 backdrop-blur-[2px] transition-colors hover:border-white hover:text-white sm:bottom-[16%] sm:left-[45%] sm:gap-3 sm:px-6 sm:py-3 sm:text-sm"
+            className="animate-rise delay-2 absolute left-[44.35%] top-[51.5%] z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 border border-white/50 bg-black/45 px-5 py-2.5 font-brand text-xs tracking-[0.16em] text-white/95 backdrop-blur-[2px] transition-colors hover:border-white hover:text-white sm:gap-3 sm:px-6 sm:py-3 sm:text-sm"
           >
             ENTER
             <span aria-hidden>→</span>

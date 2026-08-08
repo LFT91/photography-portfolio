@@ -1,6 +1,7 @@
 import type { Photo, PhotoCategory } from "@/data/photos";
 
 export const FATNI_SITE_ID = "fatni-photography";
+export const AYOUB_SITE_ID = "ayoub-el-fatni";
 
 export const PHOTO_CATEGORIES: readonly PhotoCategory[] = [
   "Nature",

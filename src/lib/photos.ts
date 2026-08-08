@@ -1,11 +1,11 @@
 import { photos as staticPhotos, type Photo } from "@/data/photos";
 import {
-  FATNI_SITE_ID,
   mapCollectionMemberships,
   mapDbPhoto,
   type DbCollectionMembership,
   type DbPhoto,
 } from "@/lib/photo-map";
+import { getActiveSiteId } from "@/lib/site";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CollectionQueryRow = {
@@ -63,6 +63,7 @@ function flattenCollectionRows(
 async function getPhotosFromCollections(
   supabase: SupabaseClient,
 ): Promise<Photo[] | null> {
+  const siteId = getActiveSiteId();
   const { data, error } = await supabase
     .from("collections")
     .select(
@@ -81,7 +82,7 @@ async function getPhotosFromCollections(
       )
     `,
     )
-    .eq("site_id", FATNI_SITE_ID)
+    .eq("site_id", siteId)
     .order("sort_order", { ascending: true });
 
   if (error || !data?.length) {
@@ -114,9 +115,9 @@ async function getPhotosLegacy(
 }
 
 /**
- * Fatni public catalog.
- * Prefer collections / collection_photos for site fatni-photography;
- * fall back to legacy photos.categories + sort_order; then static catalog.
+ * Public catalog for the active site (NEXT_PUBLIC_SITE_ID, default Fatni).
+ * Prefer collections / collection_photos; fall back to legacy photos row
+ * categories + sort_order; then static catalog.
  */
 export async function getPhotos(): Promise<Photo[]> {
   if (

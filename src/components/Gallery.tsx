@@ -27,11 +27,14 @@ function Lightbox({
   index,
   onClose,
   onChange,
+  discreet = false,
 }: {
   items: Photo[];
   index: number;
   onClose: () => void;
   onChange: (index: number) => void;
+  /** Ayoub: quieter chrome; still prev/next + keys. */
+  discreet?: boolean;
 }) {
   const photo = items[index];
   const total = items.length;
@@ -141,7 +144,11 @@ function Lightbox({
         <div className="pointer-events-none flex w-full max-w-6xl flex-col">
           <div
             key={photo.src}
-            className="lightbox-frame relative mx-auto h-[68svh] w-full sm:h-[72svh]"
+            className={`lightbox-frame relative mx-auto w-full ${
+              discreet
+                ? "h-[74svh] sm:h-[80svh]"
+                : "h-[68svh] sm:h-[72svh]"
+            }`}
           >
             <ProtectedImage
               src={photo.src}
@@ -153,14 +160,20 @@ function Lightbox({
             />
           </div>
 
-          <div className="mt-5 flex items-baseline justify-between gap-4 px-1">
-            <h3 className="font-display text-2xl italic text-paper sm:text-3xl">
+          {discreet ? (
+            <p className="mt-4 px-1 text-center font-brand text-xs tracking-[0.14em] text-fog/70">
               {photo.title}
-            </h3>
-            <p className="shrink-0 font-brand text-sm tracking-[0.08em] text-fog">
-              {photo.categories.join(" · ")}
             </p>
-          </div>
+          ) : (
+            <div className="mt-5 flex items-baseline justify-between gap-4 px-1">
+              <h3 className="font-display text-2xl italic text-paper sm:text-3xl">
+                {photo.title}
+              </h3>
+              <p className="shrink-0 font-brand text-sm tracking-[0.08em] text-fog">
+                {photo.categories.join(" · ")}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -203,20 +216,24 @@ function widthPctForScale(scale: number, span: number) {
   return Math.round((scale / span) * 1000) / 10;
 }
 
-function useGalleryLayout() {
-  const [cols, setCols] = useState(3);
+function useGalleryLayout(desktopCols: 2 | 3 = 3) {
+  const [cols, setCols] = useState<1 | 2 | 3>(desktopCols);
   const [baseCellWidth, setBaseCellWidth] = useState(320);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateCols = () => {
-      // One column on narrow phones; three per row everywhere else.
-      setCols(window.matchMedia("(min-width: 640px)").matches ? 3 : 1);
+      // Fatni: 1 → 3 from sm. Ayoub: 1 → 2 from md.
+      const mq =
+        desktopCols === 2
+          ? "(min-width: 768px)"
+          : "(min-width: 640px)";
+      setCols(window.matchMedia(mq).matches ? desktopCols : 1);
     };
     updateCols();
     window.addEventListener("resize", updateCols);
     return () => window.removeEventListener("resize", updateCols);
-  }, []);
+  }, [desktopCols]);
 
   useEffect(() => {
     const el = galleryRef.current;
@@ -439,6 +456,7 @@ function GalleryCard({
   onScale,
   onTitle,
   onDropAt,
+  uniformColumn = false,
 }: {
   photo: Photo;
   index: number;
@@ -453,6 +471,8 @@ function GalleryCard({
   onScale: (photo: Photo, next: number) => void;
   onTitle: (photo: Photo, title: string) => void;
   onDropAt: (fromKey: string, toKey: string) => void;
+  /** Ayoub: one column only — ignore displayScale spans. */
+  uniformColumn?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const imgWrapRef = useRef<HTMLDivElement>(null);
@@ -582,9 +602,9 @@ function GalleryCard({
   };
 
   const scaleMax = Math.min(SCALE_LAYOUT_MAX, cols);
-  const layoutScale = Math.min(liveScale, scaleMax);
-  const span = spanForScale(layoutScale, cols);
-  const imageWidthPct = widthPctForScale(layoutScale, span);
+  const layoutScale = uniformColumn ? 1 : Math.min(liveScale, scaleMax);
+  const span = uniformColumn ? 1 : spanForScale(layoutScale, cols);
+  const imageWidthPct = uniformColumn ? 100 : widthPctForScale(layoutScale, span);
   const scalePct = Math.round(liveScale * 100);
   const scalePctMax = Math.round(scaleMax * 100);
   const col = index % cols;
@@ -637,9 +657,9 @@ function GalleryCard({
       <div className="w-full">
         <div
           ref={imgWrapRef}
-          className={`relative mx-auto bg-ink-soft ${
-            editing && !busy ? "cursor-grab active:cursor-grabbing" : ""
-          }`}
+          className={`relative mx-auto ${
+            uniformColumn ? "bg-ink" : "bg-ink-soft"
+          } ${editing && !busy ? "cursor-grab active:cursor-grabbing" : ""}`}
           style={{ width: `${imageWidthPct}%` }}
           draggable={editing && !busy}
           onPointerDown={
@@ -762,16 +782,37 @@ function GalleryCard({
           }
           onContextMenu={(e) => e.preventDefault()}
         >
-          <div className="relative w-full overflow-hidden">
+          <div
+            className={`relative w-full min-w-0 overflow-hidden ${
+              uniformColumn ? "flex justify-center" : ""
+            }`}
+          >
             {editing ? (
               <ProtectedImage
                 src={photo.src}
                 alt={photo.title}
                 width={800}
                 height={600}
-                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
-                className="pointer-events-none h-auto w-full"
-                style={{ width: "100%", height: "auto" }}
+                sizes={
+                  uniformColumn
+                    ? "(max-width: 768px) 100vw, 580px"
+                    : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
+                }
+                className={
+                  uniformColumn
+                    ? "pointer-events-none mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
+                    : "pointer-events-none h-auto w-full"
+                }
+                style={
+                  uniformColumn
+                    ? {
+                        width: "auto",
+                        height: "auto",
+                        maxHeight: "70svh",
+                        maxWidth: "100%",
+                      }
+                    : { width: "100%", height: "auto" }
+                }
                 draggable={false}
               />
             ) : (
@@ -779,16 +820,37 @@ function GalleryCard({
                 type="button"
                 onClick={() => onOpen(photo)}
                 onContextMenu={(e) => e.preventDefault()}
-                className="block w-full overflow-hidden text-left"
+                className={`overflow-hidden text-left ${
+                  uniformColumn
+                    ? "relative mx-auto block max-w-full"
+                    : "relative block w-full min-w-0"
+                }`}
               >
                 <ProtectedImage
                   src={photo.src}
                   alt={photo.title}
                   width={800}
                   height={600}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
-                  className="h-auto w-full"
-                  style={{ width: "100%", height: "auto" }}
+                  sizes={
+                    uniformColumn
+                      ? "(max-width: 768px) 100vw, 580px"
+                      : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
+                  }
+                  className={
+                    uniformColumn
+                      ? "mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
+                      : "h-auto w-full"
+                  }
+                  style={
+                    uniformColumn
+                      ? {
+                          width: "auto",
+                          height: "auto",
+                          maxHeight: "70svh",
+                          maxWidth: "100%",
+                        }
+                      : { width: "100%", height: "auto" }
+                  }
                   draggable={false}
                 />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
@@ -1029,6 +1091,7 @@ export function Gallery({
   tightTop = false,
   items,
   highlightAfterDark = false,
+  presentation = "default",
 }: {
   title?: string;
   intro?: string;
@@ -1038,6 +1101,11 @@ export function Gallery({
   items?: Photo[];
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
+  /**
+   * default — Fatni 3-column gallery.
+   * ayoub — 2-column editorial on tablet/desktop, wider max width, quieter lightbox.
+   */
+  presentation?: "default" | "ayoub";
 }) {
   const {
     editing,
@@ -1048,7 +1116,8 @@ export function Gallery({
     markDeleted,
     setViewOrder,
   } = useAdmin();
-  const { cols, baseCellWidth, galleryRef } = useGalleryLayout();
+  const ayoub = presentation === "ayoub";
+  const { cols, baseCellWidth, galleryRef } = useGalleryLayout(ayoub ? 2 : 3);
   useDragAutoScroll(editing);
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
@@ -1136,7 +1205,7 @@ export function Gallery({
         tightTop ? "pt-6 sm:pt-8" : "pt-10 sm:pt-14"
       } ${editing ? "pb-28 sm:pb-32" : ""}`}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className={`mx-auto ${ayoub ? "max-w-[1160px]" : "max-w-7xl"}`}>
         {showHeader ? (
           <div
             className={`mb-14 flex flex-col gap-6 ${
@@ -1211,7 +1280,11 @@ export function Gallery({
         ) : (
           <div
             ref={galleryRef}
-            className="grid grid-cols-1 grid-flow-dense items-start gap-3 sm:grid-cols-3 sm:gap-4"
+            className={
+              ayoub
+                ? "grid grid-cols-1 grid-flow-dense items-start gap-6 md:grid-cols-2 md:gap-6"
+                : "grid grid-cols-1 grid-flow-dense items-start gap-3 sm:grid-cols-3 sm:gap-4"
+            }
           >
             {filtered.map((photo, index) => (
               <GalleryCard
@@ -1229,6 +1302,7 @@ export function Gallery({
                 onScale={onScale}
                 onTitle={onTitle}
                 onDropAt={onDropAt}
+                uniformColumn={ayoub}
               />
             ))}
           </div>
@@ -1241,6 +1315,7 @@ export function Gallery({
           index={activeIndex}
           onClose={() => setActiveIndex(null)}
           onChange={setActiveIndex}
+          discreet={ayoub}
         />
       ) : null}
     </section>

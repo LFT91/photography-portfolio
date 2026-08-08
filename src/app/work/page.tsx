@@ -25,6 +25,7 @@ export default async function WorkPage() {
             lockedCategory="Selected Work"
             tightTop
             items={photos}
+            presentation="ayoub"
           />
         </main>
         <Footer />

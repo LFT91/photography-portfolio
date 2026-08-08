@@ -18,7 +18,7 @@ export default async function AyoubAfterDarkPage() {
 
   const items = await getCollectionPhotos("After Dark");
   const cover =
-    items.find((photo) => photo.src.includes("after-dark-cover")) ??
+    items.find((photo) => photo.title.trim() === "Night Train") ??
     items[0] ??
     null;
 
@@ -26,7 +26,7 @@ export default async function AyoubAfterDarkPage() {
     <>
       <Header />
       <main>
-        <AfterDark items={items} cover={cover} />
+        <AfterDark items={items} cover={cover} variant="ayoub" />
       </main>
     </>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useAdmin } from "@/components/AdminProvider";
 
 export function SiteAdminBar() {
@@ -36,6 +37,12 @@ export function SiteAdminBar() {
             {user.email}
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/collections"
+              className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
+            >
+              Collections
+            </Link>
             {!editing ? (
               <button
                 type="button"

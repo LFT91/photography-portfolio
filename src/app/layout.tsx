@@ -3,6 +3,7 @@ import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
 import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
 import { SiteAdminBar } from "@/components/SiteAdminBar";
+import { getActiveSite } from "@/lib/site";
 import "./globals.css";
 
 const brand = Cormorant_Garamond({
@@ -19,14 +20,9 @@ const display = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
+const site = getActiveSite();
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://fatni-photography.vercel.app";
-
-const siteDescription =
-  "London-based photographer Ayoub El Fatni — travel, street, and night photography. Shortlisted in the British Photography Awards and Monochrome Photography Awards.";
-
-const ogDescription =
-  "London-based photographer Ayoub El Fatni — travel, street, and night photography.";
 
 const shareImage = {
   url: "/images/startrails.jpg",
@@ -37,18 +33,18 @@ const shareImage = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Fatni Photography",
-  description: siteDescription,
+  title: site.name,
+  description: site.description,
   openGraph: {
-    title: "Fatni Photography",
-    description: ogDescription,
+    title: site.name,
+    description: site.ogDescription,
     type: "website",
     images: [shareImage],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fatni Photography",
-    description: ogDescription,
+    title: site.name,
+    description: site.ogDescription,
     images: [shareImage.url],
   },
 };

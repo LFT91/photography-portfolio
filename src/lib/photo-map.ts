@@ -13,6 +13,7 @@ export const PHOTO_CATEGORIES: readonly PhotoCategory[] = [
   "Street",
   "Monochrome",
   "After Dark",
+  "Selected Work",
 ] as const;
 
 export type DbPhoto = {
@@ -57,7 +58,7 @@ export function mapDbPhoto(row: DbPhoto): Photo {
 }
 
 /**
- * Build Photo[] from Fatni collection memberships.
+ * Build Photo[] from collection memberships (Fatni or Ayoub).
  * categories + collectionOrders come from collections; sortOrder is the
  * minimum membership order (legacy-compatible single rank).
  */

@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { getActiveSite } from "@/lib/site";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
 export function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
+  const siteName = getActiveSite().name;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,7 +24,7 @@ export function ContactForm() {
 
     setStatus("sending");
 
-    const subject = `Fatni Photography inquiry from ${name}`;
+    const subject = `${siteName} inquiry from ${name}`;
     const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
     const mailto = `mailto:photo.ae@pm.me?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 

@@ -1,16 +1,20 @@
 import { ContactForm } from "@/components/ContactForm";
+import { isAyoubSite } from "@/lib/site";
 
 export function Contact() {
+  const artist = isAyoubSite();
+
   return (
     <section className="bg-ink px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2 lg:gap-24">
         <div>
           <h1 className="max-w-xl font-display text-4xl italic text-paper sm:text-6xl">
-            Get in touch
+            {artist ? "Contact" : "Get in touch"}
           </h1>
           <p className="mt-6 max-w-md text-base leading-relaxed text-paper/85">
-            For inquiries, collaborations, or print requests, email me or use
-            the form.
+            {artist
+              ? "For inquiries, email me or use the form."
+              : "For inquiries, collaborations, or print requests, email me or use the form."}
           </p>
           <a
             href="mailto:photo.ae@pm.me"

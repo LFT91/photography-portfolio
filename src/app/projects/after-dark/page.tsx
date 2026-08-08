@@ -1,29 +1,26 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { AfterDark } from "@/components/AfterDark";
 import { Header } from "@/components/Header";
-import { afterDarkCover, afterDarkPhotos } from "@/data/photos";
 import { getCollectionPhotos } from "@/lib/photos";
 import { isAyoubSite, sitePageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: sitePageTitle("After Dark"),
   description:
-    "After Dark series is a project showcasing the artist's vision of the world after nightfall.",
+    "After Dark — a photographic project by Ayoub El Fatni on the world after nightfall.",
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function AfterDarkPage() {
-  if (isAyoubSite()) {
-    redirect("/projects/after-dark");
-  }
+export default async function AyoubAfterDarkPage() {
+  if (!isAyoubSite()) notFound();
 
-  const project = await getCollectionPhotos("After Dark");
-  const items = project.length ? project : afterDarkPhotos;
+  const items = await getCollectionPhotos("After Dark");
   const cover =
     items.find((photo) => photo.src.includes("after-dark-cover")) ??
-    afterDarkCover;
+    items[0] ??
+    null;
 
   return (
     <>

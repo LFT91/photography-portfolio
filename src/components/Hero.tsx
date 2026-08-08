@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import { heroImage } from "@/data/photos";
+import { getActiveSite, isAyoubSite } from "@/lib/site";
 
-export function Hero() {
+function FatniHero() {
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden">
       <div className="absolute inset-0 animate-hero-image">
@@ -17,10 +18,7 @@ export function Hero() {
       </div>
 
       {/* Keep the photo visible, but darken behind the text so type stays readable */}
-      <div
-        className="absolute inset-0 bg-ink/25"
-        aria-hidden
-      />
+      <div className="absolute inset-0 bg-ink/25" aria-hidden />
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(11,12,14,0.72)_0%,rgba(11,12,14,0.35)_45%,rgba(11,12,14,0.2)_100%)]"
         aria-hidden
@@ -45,4 +43,36 @@ export function Hero() {
       </div>
     </section>
   );
+}
+
+/** Quiet artist landing — no stock/Fatni imagery while Selected Work is empty. */
+function AyoubHero() {
+  const { name } = getActiveSite();
+
+  return (
+    <section className="relative flex h-svh items-center justify-center overflow-hidden bg-ink">
+      <div
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(26,29,34,0.9)_0%,rgba(11,12,14,1)_70%)]"
+        aria-hidden
+      />
+      <div className="relative z-10 mx-auto w-full max-w-3xl px-5 text-center sm:px-8">
+        <h1 className="animate-rise delay-1 font-brand text-5xl font-medium leading-[1.05] tracking-[0.02em] text-paper sm:text-7xl lg:text-8xl">
+          {name}
+        </h1>
+        <div className="animate-rise delay-2 mt-12 sm:mt-14">
+          <Link
+            href="/work"
+            className="inline-flex items-center gap-3 border border-paper/35 px-6 py-3 font-brand text-sm tracking-[0.16em] text-paper/90 transition-colors hover:border-ember hover:text-ember sm:text-base"
+          >
+            Selected Work
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function Hero() {
+  return isAyoubSite() ? <AyoubHero /> : <FatniHero />;
 }

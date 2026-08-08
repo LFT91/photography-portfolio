@@ -41,6 +41,9 @@ export function CollectionManager() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
 
   useEffect(() => {
     if (!ready) return;
@@ -299,6 +302,77 @@ export function CollectionManager() {
     }
   };
 
+  /**
+   * Master-library only: storage + photos row.
+   * Never creates collection_photos memberships.
+   */
+  const uploadToLibrary = async () => {
+    if (!supabase || !uploadFile) return;
+    const title = uploadTitle.trim();
+    if (!title) {
+      setError("Enter a title before uploading.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+
+    const ext = uploadFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
+
+    try {
+      const { data: existing } = await supabase
+        .from("photos")
+        .select("sort_order")
+        .order("sort_order", { ascending: false })
+        .limit(1);
+      const maxSort = existing?.[0]?.sort_order ?? -1;
+
+      const { error: uploadError } = await supabase.storage
+        .from("photos")
+        .upload(path, uploadFile, { cacheControl: "3600", upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("photos").getPublicUrl(path);
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("photos")
+        .insert({
+          title,
+          storage_path: path,
+          public_url: publicUrl,
+          categories: [],
+          night_kind: null,
+          sort_order: maxSort + 1,
+          display_scale: 1,
+        })
+        .select("id, title, public_url")
+        .single();
+
+      if (insertError || !inserted?.id) {
+        await supabase.storage.from("photos").remove([path]);
+        throw new Error(insertError?.message ?? "Upload insert returned no id.");
+      }
+
+      setLibrary((prev) =>
+        [...prev, inserted].sort((a, b) => a.title.localeCompare(b.title)),
+      );
+      setUploadTitle("");
+      setUploadFile(null);
+      setUploadInputKey((k) => k + 1);
+      setStatus(
+        `Uploaded “${inserted.title}” to the master library (not in any collection).`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Library upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!configured) {
     return (
       <div className="mx-auto max-w-3xl px-5 py-16 sm:px-8">
@@ -389,6 +463,60 @@ export function CollectionManager() {
       {status ? (
         <p className="mt-4 font-brand text-sm text-paper/80">{status}</p>
       ) : null}
+
+      <section className="mt-10 border border-line p-5 sm:p-6">
+        <h2 className="font-brand text-lg tracking-[0.04em] text-paper">
+          Upload to library
+        </h2>
+        <p className="mt-2 max-w-2xl font-brand text-sm leading-relaxed text-paper/75">
+          Adds a photograph to the shared master library only. It will not appear
+          on Fatni Photography or Ayoub El Fatni until you assign it to a
+          collection below.
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="block sm:col-span-2">
+            <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
+              Title
+            </span>
+            <input
+              type="text"
+              value={uploadTitle}
+              disabled={busy}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              placeholder="Photograph title"
+              className="mt-2 w-full border border-line bg-transparent px-4 py-3 font-brand text-paper outline-none placeholder:text-fog focus:border-ember disabled:opacity-50"
+            />
+          </label>
+          <label className="block min-w-0">
+            <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
+              Image file
+            </span>
+            <input
+              key={uploadInputKey}
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setUploadFile(file);
+                if (file && !uploadTitle.trim()) {
+                  const base = file.name.replace(/\.[^.]+$/, "").trim();
+                  if (base) setUploadTitle(base);
+                }
+              }}
+              className="mt-2 w-full font-brand text-sm text-paper file:mr-3 file:border file:border-line file:bg-transparent file:px-3 file:py-2 file:font-brand file:text-sm file:text-paper disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || !uploadFile || !uploadTitle.trim()}
+            onClick={() => void uploadToLibrary()}
+            className="border border-ember px-5 py-3 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
+          >
+            Upload to library
+          </button>
+        </div>
+      </section>
 
       <div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr]">
         <section>

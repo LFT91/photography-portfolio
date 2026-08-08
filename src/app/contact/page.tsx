@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Contact } from "@/components/Contact";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { sitePageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Contact | Fatni Photography",
+  title: sitePageTitle("Contact"),
 };
 
 export default function ContactPage() {

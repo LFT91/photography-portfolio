@@ -6,19 +6,47 @@ export const SITE_IDS = {
 
 export type SiteId = (typeof SITE_IDS)[keyof typeof SITE_IDS];
 
+export type SiteNavLink = {
+  href: string;
+  label: string;
+};
+
 export type SiteConfig = {
   id: SiteId;
   name: string;
+  /** Short meta / OG description — no commercial services language. */
+  description: string;
+  ogDescription: string;
+  nav: SiteNavLink[];
 };
 
 export const SITES: Record<SiteId, SiteConfig> = {
   "fatni-photography": {
     id: "fatni-photography",
     name: "Fatni Photography",
+    description:
+      "London-based photographer Ayoub El Fatni — travel, street, and night photography. Shortlisted in the British Photography Awards and Monochrome Photography Awards.",
+    ogDescription:
+      "London-based photographer Ayoub El Fatni — travel, street, and night photography.",
+    nav: [
+      { href: "/work", label: "Work" },
+      { href: "/about", label: "About" },
+      { href: "/contact", label: "Contact" },
+    ],
   },
   "ayoub-el-fatni": {
     id: "ayoub-el-fatni",
     name: "Ayoub El Fatni",
+    description:
+      "Photographs by Ayoub El Fatni — selected work, monochrome, and projects.",
+    ogDescription: "Photographs by Ayoub El Fatni.",
+    nav: [
+      { href: "/work", label: "Selected Work" },
+      { href: "/monochrome", label: "Monochrome" },
+      { href: "/projects", label: "Projects" },
+      { href: "/about", label: "About" },
+      { href: "/contact", label: "Contact" },
+    ],
   },
 };
 
@@ -41,4 +69,17 @@ export function getActiveSiteId(): SiteId {
 
 export function getActiveSite(): SiteConfig {
   return SITES[getActiveSiteId()];
+}
+
+export function isFatniSite(): boolean {
+  return getActiveSiteId() === FATNI_SITE_ID;
+}
+
+export function isAyoubSite(): boolean {
+  return getActiveSiteId() === AYOUB_SITE_ID;
+}
+
+export function sitePageTitle(page?: string): string {
+  const { name } = getActiveSite();
+  return page ? `${page} | ${name}` : name;
 }

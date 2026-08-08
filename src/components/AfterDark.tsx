@@ -11,18 +11,48 @@ export function AfterDark({
   cover,
 }: {
   items: Photo[];
-  cover: Photo;
+  /** Required when items are present; omitted for empty collections. */
+  cover?: Photo | null;
 }) {
   const [entered, setEntered] = useState(false);
+  const empty = items.length === 0;
 
   useEffect(() => {
+    if (empty) {
+      document.body.style.overflow = "";
+      return;
+    }
     document.body.style.overflow = entered ? "" : "hidden";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [entered]);
+  }, [entered, empty]);
 
-  if (!entered) {
+  if (empty) {
+    return (
+      <div className="min-h-svh bg-ink pt-16 sm:pt-20">
+        <div className="border-b border-line px-5 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-7xl">
+            <p className="mb-3 font-brand text-sm tracking-[0.28em] text-ember uppercase">
+              Project
+            </p>
+            <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
+              After Dark
+            </h1>
+            <p className="mt-6 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
+              A view of the world after nightfall — its rhythm and atmosphere.
+            </p>
+            <p className="mt-10 font-brand text-paper-dim">
+              No photographs in this project yet.
+            </p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!entered && cover) {
     return (
       <section className="relative flex h-svh items-center justify-center overflow-hidden">
         <div className="absolute inset-0 animate-hero-image">
@@ -51,9 +81,8 @@ export function AfterDark({
           </h1>
           <p className="animate-rise delay-3 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
             After Dark series is a project showcasing the artist&apos;s vision of
-            the world after nightfall. He has been fascinated by the
-            world after dark for a long time due to its unique rhythm and
-            atmosphere.
+            the world after nightfall. He has been fascinated by the world after
+            dark for a long time due to its unique rhythm and atmosphere.
           </p>
           <button
             type="button"
@@ -80,9 +109,8 @@ export function AfterDark({
           </h1>
           <p className="mt-4 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
             After Dark series is a project showcasing the artist&apos;s vision of
-            the world after nightfall. He has been fascinated by the
-            world after dark for a long time due to its unique rhythm and
-            atmosphere.
+            the world after nightfall. He has been fascinated by the world after
+            dark for a long time due to its unique rhythm and atmosphere.
           </p>
         </div>
       </div>

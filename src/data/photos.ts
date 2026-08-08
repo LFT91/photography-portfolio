@@ -6,7 +6,8 @@ export type PhotoCategory =
   | "Astro"
   | "Street"
   | "Monochrome"
-  | "After Dark";
+  | "After Dark"
+  | "Selected Work";
 
 export type Photo = {
   id?: string;
@@ -15,7 +16,7 @@ export type Photo = {
   categories: PhotoCategory[];
   sortOrder?: number;
   /**
-   * Independent order within each Fatni collection (from collection_photos).
+   * Independent order within each collection (from collection_photos).
    * Used when filtering by category so multi-collection membership stays correct.
    */
   collectionOrders?: Partial<Record<PhotoCategory, number>>;
@@ -24,7 +25,10 @@ export type Photo = {
   displayScale?: number;
 };
 
-/** Work gallery filters — After Dark is a separate project. */
+/**
+ * Fatni Work gallery filters — After Dark is a separate project;
+ * Selected Work is Ayoub-only and never listed here.
+ */
 export const categories: PhotoCategory[] = [
   "Nature",
   "Urban",

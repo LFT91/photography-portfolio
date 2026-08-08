@@ -4,14 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
+import { getActiveSite, isAyoubSite } from "@/lib/site";
 
-const links = [
-  { href: "/work", label: "Work" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
-];
+function linkIsActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href !== "/" && pathname.startsWith(`${href}/`)) return true;
+  return false;
+}
 
 export function Header({ solid = false }: { solid?: boolean }) {
+  const site = getActiveSite();
+  const links = site.nav;
+  const showMark = !isAyoubSite();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -62,15 +66,15 @@ export function Header({ solid = false }: { solid?: boolean }) {
             className="relative z-[61] flex min-w-0 items-center gap-3 text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)]"
             onClick={() => setOpen(false)}
           >
-            <BrandMark />
+            {showMark ? <BrandMark /> : null}
             <span className="truncate font-brand text-[1.35rem] font-medium tracking-[0.04em] sm:text-2xl">
-              Fatni Photography
+              {site.name}
             </span>
           </Link>
 
           <nav className="hidden items-center gap-10 md:flex">
             {links.map((link) => {
-              const active = pathname === link.href;
+              const active = linkIsActive(pathname, link.href);
               return (
                 <Link
                   key={link.href}

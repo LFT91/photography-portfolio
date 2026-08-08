@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdmin } from "@/components/AdminProvider";
 import { ProtectedImage } from "@/components/ProtectedImage";
@@ -20,6 +20,23 @@ type LibraryPhoto = {
   public_url: string;
 };
 type MemberPhoto = LibraryPhoto & { sort_order: number };
+
+type LibraryQueueItem = {
+  id: string;
+  file: File;
+  title: string;
+  previewUrl: string;
+  error: string | null;
+};
+
+function titleFromFilename(filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, "");
+  return base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function revokePreview(url: string) {
+  if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+}
 
 export function CollectionManager() {
   const { ready, user } = useAdmin();
@@ -41,14 +58,32 @@ export function CollectionManager() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
-  const [uploadTitle, setUploadTitle] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [queue, setQueue] = useState<LibraryQueueItem[]>([]);
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
 
   useEffect(() => {
     if (!ready) return;
     if (!user) router.replace("/admin");
   }, [ready, user, router]);
+
+  // Revoke object-URL previews on unmount
+  useEffect(() => {
+    return () => {
+      for (const item of queueRef.current) revokePreview(item.previewUrl);
+    };
+  }, []);
+
+  const loadLibrary = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error: err } = await supabase
+      .from("photos")
+      .select("id, title, public_url")
+      .order("title", { ascending: true });
+    if (err) throw new Error(err.message);
+    setLibrary(data ?? []);
+  }, [supabase]);
 
   const loadMembers = useCallback(
     async (targetCollectionId: string) => {
@@ -303,14 +338,89 @@ export function CollectionManager() {
   };
 
   /**
-   * Master-library only: storage + photos row.
+   * Master-library only: storage + photos rows.
    * Never creates collection_photos memberships.
    */
-  const uploadToLibrary = async () => {
-    if (!supabase || !uploadFile) return;
-    const title = uploadTitle.trim();
-    if (!title) {
-      setError("Enter a title before uploading.");
+  const addFilesToQueue = (files: FileList | File[]) => {
+    const next: LibraryQueueItem[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) continue;
+      next.push({
+        id: crypto.randomUUID(),
+        file,
+        title: titleFromFilename(file.name) || "Untitled",
+        previewUrl: URL.createObjectURL(file),
+        error: null,
+      });
+    }
+    if (!next.length) return;
+    setQueue((prev) => [...prev, ...next]);
+    setError(null);
+    setStatus(null);
+  };
+
+  const updateQueueTitle = (id: string, title: string) => {
+    setQueue((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, title, error: null } : item,
+      ),
+    );
+  };
+
+  const removeFromQueue = (id: string) => {
+    setQueue((prev) => {
+      const item = prev.find((q) => q.id === id);
+      if (item) revokePreview(item.previewUrl);
+      return prev.filter((q) => q.id !== id);
+    });
+  };
+
+  const validateQueue = (
+    items: LibraryQueueItem[],
+  ): { ok: true } | { ok: false; message: string } => {
+    const empty = items.filter((item) => !item.title.trim());
+    if (empty.length) {
+      return {
+        ok: false,
+        message: `${empty.length} photograph${empty.length === 1 ? "" : "s"} missing a title.`,
+      };
+    }
+
+    const seen = new Map<string, string>();
+    for (const item of items) {
+      const key = item.title.trim().toLowerCase();
+      if (seen.has(key)) {
+        return {
+          ok: false,
+          message: `Duplicate title in queue: “${item.title.trim()}” (also “${seen.get(key)}”).`,
+        };
+      }
+      seen.set(key, item.title.trim());
+    }
+
+    const libraryTitles = new Set(
+      library.map((p) => p.title.trim().toLowerCase()),
+    );
+    for (const item of items) {
+      const key = item.title.trim().toLowerCase();
+      if (libraryTitles.has(key)) {
+        return {
+          ok: false,
+          message: `Title already exists in the master library: “${item.title.trim()}”.`,
+        };
+      }
+    }
+
+    return { ok: true };
+  };
+
+  const uploadQueueToLibrary = async () => {
+    if (!supabase || queue.length === 0) return;
+
+    const validation = validateQueue(queue);
+    if (!validation.ok) {
+      setError(validation.message);
+      setStatus(null);
       return;
     }
 
@@ -318,59 +428,87 @@ export function CollectionManager() {
     setError(null);
     setStatus(null);
 
-    const ext = uploadFile.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const { data: existing } = await supabase
+      .from("photos")
+      .select("sort_order")
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    let nextSort = (existing?.[0]?.sort_order ?? -1) + 1;
+
+    let uploaded = 0;
+    let failed = 0;
+    const remaining: LibraryQueueItem[] = [];
+
+    // Snapshot so concurrent edits don't affect this run.
+    const batch = queue.map((item) => ({
+      ...item,
+      title: item.title.trim(),
+      error: null as string | null,
+    }));
+
+    for (const item of batch) {
+      const ext = item.file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
+
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from("photos")
+          .upload(path, item.file, { cacheControl: "3600", upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("photos").getPublicUrl(path);
+
+        const { data: inserted, error: insertError } = await supabase
+          .from("photos")
+          .insert({
+            title: item.title,
+            storage_path: path,
+            public_url: publicUrl,
+            categories: [],
+            night_kind: null,
+            sort_order: nextSort,
+            display_scale: 1,
+          })
+          .select("id")
+          .single();
+
+        if (insertError || !inserted?.id) {
+          await supabase.storage.from("photos").remove([path]);
+          throw new Error(
+            insertError?.message ?? "Upload insert returned no id.",
+          );
+        }
+
+        nextSort += 1;
+        uploaded += 1;
+        revokePreview(item.previewUrl);
+      } catch (err) {
+        failed += 1;
+        remaining.push({
+          ...item,
+          error: err instanceof Error ? err.message : "Upload failed.",
+        });
+      }
+    }
 
     try {
-      const { data: existing } = await supabase
-        .from("photos")
-        .select("sort_order")
-        .order("sort_order", { ascending: false })
-        .limit(1);
-      const maxSort = existing?.[0]?.sort_order ?? -1;
-
-      const { error: uploadError } = await supabase.storage
-        .from("photos")
-        .upload(path, uploadFile, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw new Error(uploadError.message);
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("photos").getPublicUrl(path);
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("photos")
-        .insert({
-          title,
-          storage_path: path,
-          public_url: publicUrl,
-          categories: [],
-          night_kind: null,
-          sort_order: maxSort + 1,
-          display_scale: 1,
-        })
-        .select("id, title, public_url")
-        .single();
-
-      if (insertError || !inserted?.id) {
-        await supabase.storage.from("photos").remove([path]);
-        throw new Error(insertError?.message ?? "Upload insert returned no id.");
-      }
-
-      setLibrary((prev) =>
-        [...prev, inserted].sort((a, b) => a.title.localeCompare(b.title)),
-      );
-      setUploadTitle("");
-      setUploadFile(null);
-      setUploadInputKey((k) => k + 1);
-      setStatus(
-        `Uploaded “${inserted.title}” to the master library (not in any collection).`,
-      );
+      await loadLibrary();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Library upload failed.");
-    } finally {
-      setBusy(false);
+      setError(
+        err instanceof Error
+          ? `Uploads finished but library refresh failed: ${err.message}`
+          : "Uploads finished but library refresh failed.",
+      );
     }
+
+    setQueue(remaining);
+    setUploadInputKey((k) => k + 1);
+    setStatus(
+      `${uploaded} uploaded · ${failed} failed`,
+    );
+    setBusy(false);
   };
 
   if (!configured) {
@@ -469,51 +607,85 @@ export function CollectionManager() {
           Upload to library
         </h2>
         <p className="mt-2 max-w-2xl font-brand text-sm leading-relaxed text-paper/75">
-          Adds a photograph to the shared master library only. It will not appear
-          on Fatni Photography or Ayoub El Fatni until you assign it to a
-          collection below.
+          Add one or more photographs to the shared master library only. Nothing
+          here assigns membership — photos will not appear on Fatni Photography
+          or Ayoub El Fatni until you add them to a collection below.
         </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-          <label className="block sm:col-span-2">
-            <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
-              Title
-            </span>
-            <input
-              type="text"
-              value={uploadTitle}
-              disabled={busy}
-              onChange={(e) => setUploadTitle(e.target.value)}
-              placeholder="Photograph title"
-              className="mt-2 w-full border border-line bg-transparent px-4 py-3 font-brand text-paper outline-none placeholder:text-fog focus:border-ember disabled:opacity-50"
-            />
-          </label>
-          <label className="block min-w-0">
-            <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
-              Image file
-            </span>
-            <input
-              key={uploadInputKey}
-              type="file"
-              accept="image/*"
-              disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                setUploadFile(file);
-                if (file && !uploadTitle.trim()) {
-                  const base = file.name.replace(/\.[^.]+$/, "").trim();
-                  if (base) setUploadTitle(base);
-                }
-              }}
-              className="mt-2 w-full font-brand text-sm text-paper file:mr-3 file:border file:border-line file:bg-transparent file:px-3 file:py-2 file:font-brand file:text-sm file:text-paper disabled:opacity-50"
-            />
-          </label>
+
+        <label className="mt-5 block">
+          <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
+            Image files
+          </span>
+          <input
+            key={uploadInputKey}
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.files?.length) addFilesToQueue(e.target.files);
+              setUploadInputKey((k) => k + 1);
+            }}
+            className="mt-2 w-full font-brand text-sm text-paper file:mr-3 file:border file:border-line file:bg-transparent file:px-3 file:py-2 file:font-brand file:text-sm file:text-paper disabled:opacity-50"
+          />
+        </label>
+
+        {queue.length > 0 ? (
+          <ul className="mt-5 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+            {queue.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-col gap-3 border border-line/80 p-3 sm:flex-row sm:items-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.previewUrl}
+                  alt=""
+                  className="h-14 w-14 shrink-0 object-cover bg-ink"
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="truncate font-brand text-xs tracking-[0.06em] text-fog">
+                    {item.file.name}
+                  </p>
+                  <label className="block">
+                    <span className="sr-only">Title</span>
+                    <input
+                      type="text"
+                      value={item.title}
+                      disabled={busy}
+                      onChange={(e) =>
+                        updateQueueTitle(item.id, e.target.value)
+                      }
+                      placeholder="Photograph title"
+                      className="w-full border border-line bg-transparent px-3 py-2 font-brand text-sm text-paper outline-none placeholder:text-fog focus:border-ember disabled:opacity-50"
+                    />
+                  </label>
+                  {item.error ? (
+                    <p className="font-brand text-xs text-ember">{item.error}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => removeFromQueue(item.id)}
+                  className="shrink-0 self-start border border-line px-3 py-1.5 font-brand text-sm text-paper-dim transition-colors hover:text-paper disabled:opacity-40 sm:self-center"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="mt-5">
           <button
             type="button"
-            disabled={busy || !uploadFile || !uploadTitle.trim()}
-            onClick={() => void uploadToLibrary()}
+            disabled={busy || queue.length === 0}
+            onClick={() => void uploadQueueToLibrary()}
             className="border border-ember px-5 py-3 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
           >
-            Upload to library
+            Upload {queue.length} photograph{queue.length === 1 ? "" : "s"} to
+            library
           </button>
         </div>
       </section>

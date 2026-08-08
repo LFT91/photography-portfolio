@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { ArtistStagePrint } from "@/components/ArtistStagePrint";
 import { ProtectedImage } from "@/components/ProtectedImage";
-import { heroImage } from "@/data/photos";
-import { getActiveSite, isAyoubSite } from "@/lib/site";
+import { heroImage, type Photo } from "@/data/photos";
+import { isAyoubSite } from "@/lib/site";
 
 function FatniHero() {
   return (
@@ -45,34 +46,53 @@ function FatniHero() {
   );
 }
 
-/** Quiet artist landing — no stock/Fatni imagery while Selected Work is empty. */
-function AyoubHero() {
-  const { name } = getActiveSite();
-
+/**
+ * Ayoub: contained homepage photograph on black + ENTER.
+ * Brand name lives only in the header.
+ */
+function AyoubHero({ cover }: { cover?: Photo | null }) {
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden bg-ink">
-      <div
-        className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(26,29,34,0.9)_0%,rgba(11,12,14,1)_70%)]"
-        aria-hidden
-      />
-      <div className="relative z-10 mx-auto w-full max-w-3xl px-5 text-center sm:px-8">
-        <h1 className="animate-rise delay-1 font-brand text-5xl font-medium leading-[1.05] tracking-[0.02em] text-paper sm:text-7xl lg:text-8xl">
-          {name}
-        </h1>
-        <div className="animate-rise delay-2 mt-12 sm:mt-14">
+      {cover ? (
+        <div className="relative">
+          <ArtistStagePrint
+            src={cover.src}
+            alt=""
+            priority
+            mode="height"
+            blend="beams"
+          />
+
+          {/* ENTER placement approved manually — do not reposition */}
           <Link
-            href="/work"
-            className="inline-flex items-center gap-3 border border-paper/35 px-6 py-3 font-brand text-sm tracking-[0.16em] text-paper/90 transition-colors hover:border-ember hover:text-ember sm:text-base"
+            href="/monochrome"
+            className="animate-rise delay-2 absolute bottom-[14%] left-[46%] z-10 inline-flex -translate-x-1/2 items-center gap-2 border border-white/50 bg-black/45 px-5 py-2.5 font-brand text-xs tracking-[0.16em] text-white/95 backdrop-blur-[2px] transition-colors hover:border-white hover:text-white sm:bottom-[16%] sm:left-[45%] sm:gap-3 sm:px-6 sm:py-3 sm:text-sm"
           >
-            Selected Work
+            ENTER
             <span aria-hidden>→</span>
           </Link>
         </div>
-      </div>
+      ) : (
+        <>
+          <div
+            className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(26,29,34,0.9)_0%,rgba(11,12,14,1)_70%)]"
+            aria-hidden
+          />
+          <div className="relative z-10 mx-auto flex w-full max-w-3xl justify-center px-5 sm:px-8">
+            <Link
+              href="/monochrome"
+              className="animate-rise delay-2 inline-flex items-center gap-3 border border-white/55 bg-black/45 px-6 py-3 font-brand text-sm tracking-[0.16em] text-white/95 transition-colors hover:border-white hover:text-white"
+            >
+              ENTER
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
-export function Hero() {
-  return isAyoubSite() ? <AyoubHero /> : <FatniHero />;
+export function Hero({ ayoubCover = null }: { ayoubCover?: Photo | null }) {
+  return isAyoubSite() ? <AyoubHero cover={ayoubCover} /> : <FatniHero />;
 }

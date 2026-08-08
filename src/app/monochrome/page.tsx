@@ -27,6 +27,7 @@ export default async function MonochromePage() {
           lockedCategory="Monochrome"
           tightTop
           items={photos}
+          presentation="ayoub"
         />
       </main>
       <Footer />

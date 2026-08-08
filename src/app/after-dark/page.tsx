@@ -3,6 +3,7 @@ import { AfterDark } from "@/components/AfterDark";
 import { Header } from "@/components/Header";
 import { afterDarkCover, afterDarkPhotos } from "@/data/photos";
 import { getPhotos } from "@/lib/photos";
+import { photoOrderInCategory } from "@/lib/photo-map";
 
 export const metadata: Metadata = {
   title: "After Dark | Fatni Photography",
@@ -14,9 +15,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AfterDarkPage() {
   const photos = await getPhotos();
-  const project = photos.filter((photo) =>
-    photo.categories.includes("After Dark"),
-  );
+  const project = photos
+    .filter((photo) => photo.categories.includes("After Dark"))
+    .sort(
+      (a, b) =>
+        photoOrderInCategory(a, "After Dark") -
+        photoOrderInCategory(b, "After Dark"),
+    );
   const items = project.length ? project : afterDarkPhotos;
   const cover =
     items.find((photo) => photo.src.includes("after-dark-cover")) ??

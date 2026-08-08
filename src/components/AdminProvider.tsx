@@ -1,5 +1,10 @@
 "use client";
 
+import type { Photo, PhotoCategory } from "@/data/photos";
+import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
+import { FATNI_SITE_ID, photoOrderInCategory } from "@/lib/photo-map";
+import type { User } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -9,10 +14,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
-import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
-import type { Photo, PhotoCategory } from "@/data/photos";
 
 export type PendingUpload = {
   localId: string;
@@ -106,7 +107,9 @@ export function applyDraftToList(
   const combined = [...patched, ...pending];
   const order = draft.orders[viewKey];
   if (!order?.length) {
-    return combined.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return combined.sort(
+      (a, b) => photoOrderInCategory(a, viewKey) - photoOrderInCategory(b, viewKey),
+    );
   }
 
   const keyOf = (p: Photo) => p.id || p.src;
@@ -418,42 +421,90 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const current = draft;
       const idMap = new Map<string, string>(); // pending localId → real id
 
-      // 1. Uploads
+      // 1. Uploads — master photos row (legacy fields) + Fatni collection membership
       for (const upload of current.uploads) {
         const ext = upload.file.name.split(".").pop()?.toLowerCase() || "jpg";
         const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
+        let insertedId: string | null = null;
 
-        const { data: existing } = await supabase
-          .from("photos")
-          .select("sort_order")
-          .order("sort_order", { ascending: false })
-          .limit(1);
-        const maxSort = existing?.[0]?.sort_order ?? -1;
+        try {
+          const { data: existing } = await supabase
+            .from("photos")
+            .select("sort_order")
+            .order("sort_order", { ascending: false })
+            .limit(1);
+          const maxSort = existing?.[0]?.sort_order ?? -1;
 
-        const { error: uploadError } = await supabase.storage
-          .from("photos")
-          .upload(path, upload.file, { cacheControl: "3600", upsert: false });
-        if (uploadError) throw new Error(uploadError.message);
+          const { error: uploadError } = await supabase.storage
+            .from("photos")
+            .upload(path, upload.file, { cacheControl: "3600", upsert: false });
+          if (uploadError) throw new Error(uploadError.message);
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("photos").getPublicUrl(path);
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("photos").getPublicUrl(path);
 
-        const { data: inserted, error: insertError } = await supabase
-          .from("photos")
-          .insert({
-            title: upload.title.trim() || "Untitled",
-            storage_path: path,
-            public_url: publicUrl,
-            categories: upload.categories,
-            night_kind: null,
-            sort_order: maxSort + 1,
-            display_scale: upload.displayScale,
-          })
-          .select("id")
-          .single();
-        if (insertError) throw new Error(insertError.message);
-        if (inserted?.id) idMap.set(upload.localId, inserted.id);
+          const { data: inserted, error: insertError } = await supabase
+            .from("photos")
+            .insert({
+              title: upload.title.trim() || "Untitled",
+              storage_path: path,
+              public_url: publicUrl,
+              categories: upload.categories,
+              night_kind: null,
+              sort_order: maxSort + 1,
+              display_scale: upload.displayScale,
+            })
+            .select("id")
+            .single();
+          if (insertError) throw new Error(insertError.message);
+          if (!inserted?.id) throw new Error("Upload insert returned no id.");
+          insertedId = inserted.id;
+          const photoId = inserted.id;
+
+          // Membership in each target Fatni collection (UI uploads one room).
+          for (const category of upload.categories) {
+            const { data: collection, error: collectionError } = await supabase
+              .from("collections")
+              .select("id")
+              .eq("site_id", FATNI_SITE_ID)
+              .eq("title", category)
+              .maybeSingle();
+            if (collectionError) throw new Error(collectionError.message);
+            if (!collection?.id) {
+              throw new Error(
+                `No Fatni collection found for “${category}”. Upload was rolled back.`,
+              );
+            }
+
+            const { data: membershipMax, error: maxError } = await supabase
+              .from("collection_photos")
+              .select("sort_order")
+              .eq("collection_id", collection.id)
+              .order("sort_order", { ascending: false })
+              .limit(1);
+            if (maxError) throw new Error(maxError.message);
+            const nextPos = (membershipMax?.[0]?.sort_order ?? -1) + 1;
+
+            const { error: membershipError } = await supabase
+              .from("collection_photos")
+              .insert({
+                collection_id: collection.id,
+                photo_id: photoId,
+                sort_order: nextPos,
+              });
+            if (membershipError) throw new Error(membershipError.message);
+          }
+
+          idMap.set(upload.localId, photoId);
+        } catch (err) {
+          // Do not leave storage/photo without collection membership.
+          if (insertedId) {
+            await supabase.from("photos").delete().eq("id", insertedId);
+          }
+          await supabase.storage.from("photos").remove([path]);
+          throw err;
+        }
       }
 
       // 2. Deletes
@@ -521,32 +572,54 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (error) throw new Error(error.message);
       }
 
-      // 5. Reorders — resolve pending ids, permute existing sort_order values
-      for (const ids of Object.values(current.orders)) {
+      // 5. Reorders — write independent order to Fatni collection_photos.sort_order
+      for (const [viewKey, ids] of Object.entries(current.orders)) {
         const resolved = ids
           .map((id) => (id.startsWith("pending:") ? idMap.get(id) : id))
           .filter((id): id is string => Boolean(id));
         if (resolved.length < 2) continue;
 
+        const { data: collection, error: collectionError } = await supabase
+          .from("collections")
+          .select("id")
+          .eq("site_id", FATNI_SITE_ID)
+          .eq("title", viewKey)
+          .maybeSingle();
+        if (collectionError) throw new Error(collectionError.message);
+        if (!collection?.id) {
+          throw new Error(
+            `No Fatni collection found for “${viewKey}”. Reorder was not saved.`,
+          );
+        }
+
         const { data: rows, error: fetchError } = await supabase
-          .from("photos")
-          .select("id, sort_order")
-          .in("id", resolved);
+          .from("collection_photos")
+          .select("photo_id, sort_order")
+          .eq("collection_id", collection.id)
+          .in("photo_id", resolved);
         if (fetchError) throw new Error(fetchError.message);
 
         const orderById = new Map(
-          (rows ?? []).map((r) => [r.id as string, r.sort_order as number]),
+          (rows ?? []).map((r) => [
+            r.photo_id as string,
+            r.sort_order as number,
+          ]),
         );
         const orders = resolved
           .map((id) => orderById.get(id))
           .filter((n): n is number => n != null)
           .sort((a, b) => a - b);
 
+        // Same guard as legacy: skip room if any photo lacks membership.
         if (orders.length !== resolved.length) continue;
 
         await Promise.all(
           resolved.map((id, i) =>
-            supabase.from("photos").update({ sort_order: orders[i] }).eq("id", id),
+            supabase
+              .from("collection_photos")
+              .update({ sort_order: orders[i] })
+              .eq("collection_id", collection.id)
+              .eq("photo_id", id),
           ),
         );
       }

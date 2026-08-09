@@ -8,7 +8,7 @@ import { isAyoubSite, sitePageTitle } from "@/lib/site";
 export const metadata: Metadata = {
   title: sitePageTitle("After Dark"),
   description:
-    "After Dark — a photographic project by Ayoub El Fatni on the world after nightfall.",
+    "After Dark is the city at night when it stops feeling ordinary. Photographs by Ayoub El Fatni.",
 };
 
 export const dynamic = "force-dynamic";

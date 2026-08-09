@@ -11,7 +11,7 @@ const FATNI_STATEMENT =
   "After Dark series is a project showcasing the artist's vision of the world after nightfall. He has been fascinated by the world after dark for a long time due to its unique rhythm and atmosphere.";
 
 const AYOUB_STATEMENT =
-  "After Dark is a study of the city when artificial light becomes structure. Rain, fog and passing figures turn familiar streets into brief, isolated scenes.";
+  "After Dark is the city at night when it stops feeling ordinary. Lit doorways and empty streets hold people in brief scenes that feel close, and a little strange.";
 
 export function AfterDark({
   items,
@@ -69,11 +69,21 @@ export function AfterDark({
 
   // Ayoub: Night Train introduction then gallery in one scrollable page (no second ENTER).
   if (ayoub) {
+    const count = items.length;
+    const countLabel =
+      count === 1 ? "1 photograph ↓" : `${count} photographs ↓`;
+
+    const scrollToGallery = () => {
+      document
+        .getElementById("after-dark-photographs")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
     return (
       <div className="min-h-svh bg-ink">
         {cover ? (
-          <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-ink">
-            <div className="absolute inset-0 flex items-center justify-center px-3 sm:px-6">
+          <section className="relative flex flex-col items-center justify-center bg-ink px-3 pb-3 pt-20 sm:px-6 sm:pb-4 sm:pt-24">
+            <div className="relative inline-flex max-w-full">
               <ArtistStagePrint
                 src={cover.src}
                 alt={cover.title}
@@ -81,26 +91,39 @@ export function AfterDark({
                 mode="width"
                 blend="night"
               />
-            </div>
-
-            <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center px-5 text-center sm:px-8">
-              <h1 className="animate-rise delay-1 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
-                After Dark
-              </h1>
-              <p className="animate-rise delay-2 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
-                {AYOUB_STATEMENT}
-              </p>
+              <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-5 text-center sm:px-8">
+                <h1 className="animate-rise delay-1 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
+                  After Dark
+                </h1>
+                <p className="animate-rise delay-2 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
+                  {AYOUB_STATEMENT}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={scrollToGallery}
+                className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 font-brand text-sm tracking-[0.06em] text-white/55 transition-colors hover:text-white/80 sm:bottom-4 sm:text-[0.95rem]"
+              >
+                {countLabel}
+              </button>
             </div>
           </section>
         ) : (
-          <div className="px-5 pb-2 pt-20 sm:px-8 sm:pt-24">
-            <div className="mx-auto max-w-7xl">
+          <div className="px-5 pb-3 pt-20 sm:px-8 sm:pb-4 sm:pt-24">
+            <div className="mx-auto max-w-7xl text-center sm:text-left">
               <h1 className="font-display text-3xl italic text-paper sm:text-4xl">
                 After Dark
               </h1>
               <p className="mt-6 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
                 {AYOUB_STATEMENT}
               </p>
+              <button
+                type="button"
+                onClick={scrollToGallery}
+                className="mt-8 font-brand text-sm tracking-[0.06em] text-white/55 transition-colors hover:text-white/80 sm:text-[0.95rem]"
+              >
+                {countLabel}
+              </button>
             </div>
           </div>
         )}
@@ -109,7 +132,8 @@ export function AfterDark({
           lockedCategory="After Dark"
           showFilters={false}
           title=""
-          tightTop
+          compactTop
+          sectionId="after-dark-photographs"
           items={items}
           presentation="ayoub"
         />

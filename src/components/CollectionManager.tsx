@@ -60,6 +60,9 @@ export function CollectionManager() {
   const [booting, setBooting] = useState(true);
   const [queue, setQueue] = useState<LibraryQueueItem[]>([]);
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  /** Member row currently choosing a move destination. */
+  const [movingPhotoId, setMovingPhotoId] = useState<string | null>(null);
+  const [moveTargetId, setMoveTargetId] = useState("");
   const queueRef = useRef(queue);
   queueRef.current = queue;
 
@@ -231,6 +234,12 @@ export function CollectionManager() {
     });
   }, [library, memberIds, libraryQuery]);
 
+  /** Other collections on the currently selected site (excludes the open collection). */
+  const moveDestinations = useMemo(
+    () => collections.filter((c) => c.id !== collectionId),
+    [collections, collectionId],
+  );
+
   const persistOrder = async (ordered: MemberPhoto[]) => {
     if (!supabase || !collectionId) return;
     const ranks = ordered
@@ -332,6 +341,94 @@ export function CollectionManager() {
       await loadMembers(collectionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Remove failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Move membership within the current site: insert at end of destination,
+   * then remove from the source collection. Master `photos` row is untouched.
+   */
+  const movePhotoToCollection = async (
+    photo: MemberPhoto,
+    destinationId: string,
+  ) => {
+    if (!supabase || !collectionId || !destinationId) return;
+    if (destinationId === collectionId) return;
+
+    const destination = collections.find((c) => c.id === destinationId);
+    if (!destination) {
+      setError("Destination collection not found for this site.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Move “${photo.title}” to “${destination.title}”? It will leave this collection.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const { data: existingRows, error: existingError } = await supabase
+        .from("collection_photos")
+        .select("photo_id")
+        .eq("collection_id", destinationId)
+        .eq("photo_id", photo.id)
+        .limit(1);
+      if (existingError) throw new Error(existingError.message);
+
+      if (!existingRows?.length) {
+        const { data: maxRows, error: maxError } = await supabase
+          .from("collection_photos")
+          .select("sort_order")
+          .eq("collection_id", destinationId)
+          .order("sort_order", { ascending: false })
+          .limit(1);
+        if (maxError) throw new Error(maxError.message);
+        const nextPos = (maxRows?.[0]?.sort_order ?? -1) + 1;
+
+        const { error: insertError } = await supabase
+          .from("collection_photos")
+          .insert({
+            collection_id: destinationId,
+            photo_id: photo.id,
+            sort_order: nextPos,
+          });
+        if (insertError) throw new Error(insertError.message);
+      }
+
+      const { error: deleteError } = await supabase
+        .from("collection_photos")
+        .delete()
+        .eq("collection_id", collectionId)
+        .eq("photo_id", photo.id);
+      if (deleteError) {
+        throw new Error(
+          `Added to “${destination.title}” but could not remove from this collection: ${deleteError.message}`,
+        );
+      }
+
+      setMovingPhotoId(null);
+      setMoveTargetId("");
+      setStatus(
+        existingRows?.length
+          ? `Moved “${photo.title}” to “${destination.title}” (already a member; removed from this collection).`
+          : `Moved “${photo.title}” to “${destination.title}”.`,
+      );
+      await loadMembers(collectionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Move failed.");
+      try {
+        await loadMembers(collectionId);
+      } catch {
+        /* keep primary error */
+      }
     } finally {
       setBusy(false);
     }
@@ -566,7 +663,11 @@ export function CollectionManager() {
           <select
             value={siteId}
             disabled={busy}
-            onChange={(e) => setSiteId(e.target.value)}
+            onChange={(e) => {
+              setMovingPhotoId(null);
+              setMoveTargetId("");
+              setSiteId(e.target.value);
+            }}
             className="mt-2 w-full border border-line bg-ink px-4 py-3 font-brand text-paper outline-none focus:border-ember"
           >
             {sites.map((site) => (
@@ -583,7 +684,11 @@ export function CollectionManager() {
           <select
             value={collectionId}
             disabled={busy || !collections.length}
-            onChange={(e) => setCollectionId(e.target.value)}
+            onChange={(e) => {
+              setMovingPhotoId(null);
+              setMoveTargetId("");
+              setCollectionId(e.target.value);
+            }}
             className="mt-2 w-full border border-line bg-ink px-4 py-3 font-brand text-paper outline-none focus:border-ember"
           >
             {collections.map((c) => (
@@ -732,7 +837,7 @@ export function CollectionManager() {
                       #{index + 1} · sort {photo.sort_order}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                  <div className="flex shrink-0 flex-col items-stretch gap-1 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                       type="button"
                       disabled={busy || index === 0}
@@ -751,6 +856,64 @@ export function CollectionManager() {
                     >
                       ↓
                     </button>
+                    {movingPhotoId === photo.id ? (
+                      <>
+                        <select
+                          value={moveTargetId}
+                          disabled={busy || moveDestinations.length === 0}
+                          onChange={(e) => setMoveTargetId(e.target.value)}
+                          className="max-w-[10rem] border border-line bg-ink px-2 py-1 font-brand text-sm text-paper outline-none focus:border-ember disabled:opacity-40"
+                          aria-label="Destination collection"
+                        >
+                          <option value="">Move to…</option>
+                          {moveDestinations.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.title}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={busy || !moveTargetId}
+                          onClick={() =>
+                            void movePhotoToCollection(photo, moveTargetId)
+                          }
+                          className="border border-ember px-2 py-1 font-brand text-sm text-ember transition-colors hover:bg-ember/10 disabled:opacity-30"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            setMovingPhotoId(null);
+                            setMoveTargetId("");
+                          }}
+                          className="border border-line px-2 py-1 font-brand text-sm text-paper-dim transition-colors hover:text-paper disabled:opacity-30"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy || moveDestinations.length === 0}
+                        onClick={() => {
+                          setMovingPhotoId(photo.id);
+                          setMoveTargetId("");
+                          setError(null);
+                          setStatus(null);
+                        }}
+                        className="border border-line px-2 py-1 font-brand text-sm text-paper-dim transition-colors hover:text-paper disabled:opacity-30"
+                        title={
+                          moveDestinations.length === 0
+                            ? "No other collections on this site"
+                            : "Move to another collection on this site"
+                        }
+                      >
+                        Move
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy}

@@ -10,7 +10,7 @@ import {
 import { isAyoubSite, sitePageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: sitePageTitle(isAyoubSite() ? "Selected Work" : "Work"),
+  title: sitePageTitle(isAyoubSite() ? "Selected Work" : "Collections"),
 };
 
 export const dynamic = "force-dynamic";
@@ -45,8 +45,8 @@ export default async function WorkPage() {
       <main className="min-h-svh pt-16 sm:pt-20">
         <CollectionIndex
           collections={collections}
-          heading="Work"
-          intro="Browse the archive by collection — landscape, cities, street, sky and monochrome."
+          heading="Collections"
+          intro="Landscape, cities, street, sky and monochrome."
         />
       </main>
       <Footer />

@@ -30,14 +30,14 @@ function FatniHero() {
           Fatni Photography
         </h1>
         <p className="animate-rise delay-2 mx-auto mt-5 max-w-md text-base leading-relaxed text-white/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-lg">
-          Nature, street, architecture, and night.
+          A broader photographic archive.
         </p>
         <div className="animate-rise delay-3 mt-10 sm:mt-12">
           <Link
             href="/work"
             className="inline-flex items-center gap-3 border border-white/70 bg-black/45 px-7 py-3.5 font-brand text-lg tracking-[0.06em] text-white shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-colors hover:border-ember hover:bg-ember/20 hover:text-ember sm:px-8 sm:py-4 sm:text-xl"
           >
-            View work
+            Explore work
             <span aria-hidden>→</span>
           </Link>
         </div>

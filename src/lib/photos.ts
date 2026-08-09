@@ -5,17 +5,24 @@ import {
   type PhotoCategory,
 } from "@/data/photos";
 import {
+  FATNI_PUBLIC_COLLECTIONS,
+  fatniHrefForSlug,
+  type FatniCollectionSummary,
+} from "@/lib/fatni-collections";
+import {
+  isPhotoCategory,
   mapCollectionMemberships,
   mapDbPhoto,
   photoOrderInCategory,
   type DbCollectionMembership,
   type DbPhoto,
 } from "@/lib/photo-map";
-import { FATNI_SITE_ID, getActiveSiteId } from "@/lib/site";
+import { FATNI_SITE_ID, getActiveSiteId, isFatniSite } from "@/lib/site";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CollectionQueryRow = {
   title: string;
+  slug?: string;
   sort_order: number;
   collection_photos:
     | {
@@ -84,6 +91,7 @@ async function getPhotosFromCollections(
     .select(
       `
       title,
+      slug,
       sort_order,
       collection_photos (
         sort_order,
@@ -98,7 +106,11 @@ async function getPhotosFromCollections(
     `,
     )
     .eq("site_id", siteId)
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .order("sort_order", {
+      ascending: true,
+      referencedTable: "collection_photos",
+    });
 
   if (error || !data?.length) {
     return { kind: "unavailable" };
@@ -187,4 +199,131 @@ export async function getCollectionPhotos(
         photoOrderInCategory(a, collection) -
         photoOrderInCategory(b, collection),
     );
+}
+
+function coverFromMemberships(
+  links: CollectionQueryRow["collection_photos"],
+): FatniCollectionSummary["cover"] {
+  if (!links?.length) return null;
+  const ordered = [...links].sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
+  for (const link of ordered) {
+    const raw = link.photo;
+    const photo = Array.isArray(raw) ? raw[0] : raw;
+    if (!photo?.public_url) continue;
+    return { src: photo.public_url, title: photo.title };
+  }
+  return null;
+}
+
+function fatniSummariesFromStatic(): FatniCollectionSummary[] {
+  return FATNI_PUBLIC_COLLECTIONS.filter((def) => !def.special).map((def) => {
+    const members = staticPhotos
+      .filter((p) => photoInCategory(p, def.title))
+      .sort(
+        (a, b) =>
+          photoOrderInCategory(a, def.title) -
+          photoOrderInCategory(b, def.title),
+      );
+    const first = members[0];
+    return {
+      slug: def.slug,
+      title: def.title,
+      href: def.href,
+      special: false,
+      count: members.length,
+      cover: first ? { src: first.src, title: first.title } : null,
+    };
+  });
+}
+
+/**
+ * Fatni public archive index tiles — DB order + first membership as cover.
+ * After Dark is intentionally omitted from the public index/preview
+ * (data and /after-dark remain intact). Empty on non-Fatni deployments.
+ */
+export async function getFatniCollectionSummaries(): Promise<
+  FatniCollectionSummary[]
+> {
+  if (!isFatniSite()) return [];
+
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return fatniSummariesFromStatic();
+  }
+
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const siteId = getActiveSiteId();
+
+    const { data, error } = await supabase
+      .from("collections")
+      .select(
+        `
+        title,
+        slug,
+        sort_order,
+        collection_photos (
+          sort_order,
+          photo:photos (
+            id,
+            title,
+            storage_path,
+            public_url,
+            display_scale
+          )
+        )
+      `,
+      )
+      .eq("site_id", siteId)
+      .order("sort_order", { ascending: true })
+      .order("sort_order", {
+        ascending: true,
+        referencedTable: "collection_photos",
+      });
+
+    if (error || !data?.length) {
+      return fatniSummariesFromStatic();
+    }
+
+    const rows = data as CollectionQueryRow[];
+    const summaries: FatniCollectionSummary[] = [];
+
+    for (const row of rows) {
+      if (!isPhotoCategory(row.title)) continue;
+      const slug =
+        row.slug ||
+        FATNI_PUBLIC_COLLECTIONS.find((c) => c.title === row.title)?.slug;
+      if (!slug) continue;
+
+      const def = FATNI_PUBLIC_COLLECTIONS.find((c) => c.slug === slug);
+      const special = Boolean(def?.special) || slug === "after-dark";
+      // Public archive index: Nature / Urban / Astro / Street / Monochrome only.
+      if (special) continue;
+
+      const links = row.collection_photos ?? [];
+      const count = links.filter((link) => {
+        const raw = link.photo;
+        const photo = Array.isArray(raw) ? raw[0] : raw;
+        return Boolean(photo?.id);
+      }).length;
+
+      summaries.push({
+        slug,
+        title: row.title,
+        href: def?.href ?? fatniHrefForSlug(slug),
+        special: false,
+        count,
+        cover: coverFromMemberships(links),
+      });
+    }
+
+    return summaries.length ? summaries : fatniSummariesFromStatic();
+  } catch {
+    return fatniSummariesFromStatic();
+  }
 }

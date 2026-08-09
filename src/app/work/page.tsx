@@ -11,6 +11,10 @@ import { isAyoubSite, sitePageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: sitePageTitle(isAyoubSite() ? "Selected Work" : "Collections"),
+  description: isAyoubSite()
+    ? "Selected Work by Ayoub El Fatni."
+    : "Browse the Fatni Photography archive by collection.",
+  alternates: { canonical: "/work" },
 };
 
 export const dynamic = "force-dynamic";

@@ -3,7 +3,7 @@ import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
 import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
 import { SiteAdminBar } from "@/components/SiteAdminBar";
-import { getActiveSite } from "@/lib/site";
+import { getActiveSite, getPublicSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 const brand = Cormorant_Garamond({
@@ -21,8 +21,7 @@ const display = Instrument_Serif({
 });
 
 const site = getActiveSite();
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://fatni-photography.vercel.app";
+const siteUrl = getPublicSiteUrl();
 
 const shareImage = {
   url: "/images/startrails.jpg",
@@ -39,6 +38,8 @@ export const metadata: Metadata = {
     title: site.name,
     description: site.ogDescription,
     type: "website",
+    siteName: site.name,
+    url: siteUrl,
     images: [shareImage],
   },
   twitter: {

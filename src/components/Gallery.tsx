@@ -807,7 +807,7 @@ function GalleryCard({
                 className={
                   uniformColumn
                     ? "pointer-events-none mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
-                    : "pointer-events-none h-auto w-full"
+                    : "pointer-events-none h-auto w-full max-h-[85svh] object-contain md:max-h-none"
                 }
                 style={
                   uniformColumn
@@ -842,24 +842,24 @@ function GalleryCard({
                       ? "(max-width: 768px) 100vw, 580px"
                       : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
                   }
-                  className={
-                    uniformColumn
-                      ? "mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
-                      : "h-auto w-full"
-                  }
-                  style={
-                    uniformColumn
-                      ? {
-                          width: "auto",
-                          height: "auto",
-                          maxHeight: "70svh",
-                          maxWidth: "100%",
-                        }
-                      : { width: "100%", height: "auto" }
-                  }
+                className={
+                  uniformColumn
+                    ? "mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
+                    : "h-auto w-full max-h-[85svh] object-contain md:max-h-none"
+                }
+                style={
+                  uniformColumn
+                    ? {
+                        width: "auto",
+                        height: "auto",
+                        maxHeight: "70svh",
+                        maxWidth: "100%",
+                      }
+                    : { width: "100%", height: "auto" }
+                }
                   draggable={false}
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-100 transition-opacity duration-500 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <p className="font-display text-xl italic text-paper">
                     {photo.title}
                   </p>

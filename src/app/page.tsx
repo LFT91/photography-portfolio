@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import type { Photo } from "@/data/photos";
 import { isAyoubSite } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 /** Approved Ayoub homepage façade (local asset; not from Supabase membership). */
 const AYOUB_HOMEPAGE_COVER: Photo = {

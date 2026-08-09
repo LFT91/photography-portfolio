@@ -41,8 +41,8 @@ export const SITES: Record<SiteId, SiteConfig> = {
       "Photographs by Ayoub El Fatni — selected work, monochrome, and projects.",
     ogDescription: "Photographs by Ayoub El Fatni.",
     nav: [
-      { href: "/monochrome", label: "Monochrome" },
       { href: "/projects/after-dark", label: "After Dark" },
+      { href: "/monochrome", label: "Monochrome" },
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
     ],

@@ -1,15 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { getActiveSite } from "@/lib/site";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
 export function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
-  const siteName = getActiveSite().name;
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
@@ -19,18 +18,38 @@ export function ContactForm() {
 
     if (!name || !email || !message) {
       setStatus("error");
+      setErrorMessage("Please fill in all fields.");
       return;
     }
 
     setStatus("sending");
+    setErrorMessage(null);
 
-    const subject = `${siteName} inquiry from ${name}`;
-    const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
-    const mailto = `mailto:photo.ae@pm.me?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message }),
+      });
 
-    window.location.href = mailto;
-    setStatus("sent");
-    form.reset();
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        setStatus("error");
+        setErrorMessage(
+          payload?.error || "Unable to send your message right now.",
+        );
+        return;
+      }
+
+      setStatus("sent");
+      form.reset();
+    } catch {
+      setStatus("error");
+      setErrorMessage("Unable to send your message right now.");
+    }
   };
 
   return (
@@ -82,18 +101,16 @@ export function ContactForm() {
           disabled={status === "sending"}
           className="inline-flex items-center gap-3 border border-paper/65 bg-paper/12 px-7 py-3.5 font-brand text-lg tracking-[0.06em] text-paper transition-colors hover:border-ember hover:bg-ember/15 hover:text-ember disabled:opacity-50"
         >
-          Send message
+          {status === "sending" ? "Sending…" : "Send message"}
           <span aria-hidden>→</span>
         </button>
         {status === "sent" ? (
           <p className="font-brand text-sm text-paper/80">
-            Opening your email app…
+            Thanks for contacting us. We&apos;ll get back to you soon.
           </p>
         ) : null}
-        {status === "error" ? (
-          <p className="font-brand text-sm text-ember">
-            Please fill in all fields.
-          </p>
+        {status === "error" && errorMessage ? (
+          <p className="font-brand text-sm text-ember">{errorMessage}</p>
         ) : null}
       </div>
     </form>

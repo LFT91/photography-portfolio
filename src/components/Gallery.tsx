@@ -1098,6 +1098,8 @@ export function Gallery({
   lockedCategory,
   showFilters = true,
   tightTop = false,
+  compactTop = false,
+  sectionId,
   items,
   highlightAfterDark = false,
   presentation = "default",
@@ -1107,6 +1109,10 @@ export function Gallery({
   lockedCategory?: PhotoCategory;
   showFilters?: boolean;
   tightTop?: boolean;
+  /** Slightly less top padding than tightTop (Ayoub After Dark intro → gallery). */
+  compactTop?: boolean;
+  /** Optional DOM id for in-page anchors. */
+  sectionId?: string;
   items?: Photo[];
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
@@ -1212,8 +1218,15 @@ export function Gallery({
 
   return (
     <section
+      id={sectionId}
       className={`relative bg-ink px-5 pb-16 sm:px-8 sm:pb-24 ${
-        tightTop ? "pt-6 sm:pt-8" : "pt-10 sm:pt-14"
+        sectionId ? "scroll-mt-16 sm:scroll-mt-20" : ""
+      } ${
+        compactTop
+          ? "pt-4 sm:pt-5"
+          : tightTop
+            ? "pt-6 sm:pt-8"
+            : "pt-10 sm:pt-14"
       } ${editing ? "pb-28 sm:pb-32" : ""}`}
     >
       <div className={`mx-auto ${ayoub ? "max-w-[1160px]" : "max-w-7xl"}`}>

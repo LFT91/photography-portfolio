@@ -1,0 +1,84 @@
+import type { PhotoCategory } from "@/data/photos";
+
+/**
+ * Fatni public archive collections.
+ * Photographs come from Supabase membership/order; this config drives
+ * public hrefs. After Dark stays in data + /after-dark, but is excluded
+ * from the public archive index/preview.
+ *
+ * Adding a future collection: seed a collections row (site_id + slug + title),
+ * extend PhotoCategory if needed, and append a def here (or rely on DB
+ * slug → /work/[slug] once title is a known category).
+ */
+export type FatniCollectionDef = {
+  slug: string;
+  title: PhotoCategory;
+  /** Public path visitors open. */
+  href: string;
+  /**
+   * Not shown on the Fatni archive index/homepage preview
+   * (kept for routing / project presentation).
+   */
+  special?: boolean;
+};
+
+/** Public Fatni archive rooms (After Dark is special — not indexed). */
+export const FATNI_PUBLIC_COLLECTIONS: readonly FatniCollectionDef[] = [
+  { slug: "nature", title: "Nature", href: "/work/nature" },
+  { slug: "urban", title: "Urban", href: "/work/urban" },
+  { slug: "astro", title: "Astro", href: "/work/astro" },
+  { slug: "street", title: "Street", href: "/work/street" },
+  { slug: "monochrome", title: "Monochrome", href: "/work/monochrome" },
+  {
+    slug: "after-dark",
+    title: "After Dark",
+    href: "/after-dark",
+    special: true,
+  },
+] as const;
+
+export type FatniCollectionSummary = {
+  slug: string;
+  title: PhotoCategory;
+  href: string;
+  special: boolean;
+  count: number;
+  /** First membership-ordered photograph (Collection Manager sequence). */
+  cover: {
+    src: string;
+    title: string;
+  } | null;
+};
+
+export function fatniHrefForSlug(slug: string): string {
+  const known = FATNI_PUBLIC_COLLECTIONS.find((c) => c.slug === slug);
+  if (known) return known.href;
+  return `/work/${slug}`;
+}
+
+export function fatniDefBySlug(slug: string): FatniCollectionDef | undefined {
+  return FATNI_PUBLIC_COLLECTIONS.find((c) => c.slug === slug);
+}
+
+export function fatniDefByTitle(
+  title: string,
+): FatniCollectionDef | undefined {
+  return FATNI_PUBLIC_COLLECTIONS.find((c) => c.title === title);
+}
+
+/** Regular archive rooms (excludes After Dark project). */
+export function fatniArchiveCollections(): FatniCollectionDef[] {
+  return FATNI_PUBLIC_COLLECTIONS.filter((c) => !c.special);
+}
+
+export function fatniAdjacentArchive(
+  slug: string,
+): { prev: FatniCollectionDef | null; next: FatniCollectionDef | null } {
+  const rooms = fatniArchiveCollections();
+  const i = rooms.findIndex((c) => c.slug === slug);
+  if (i < 0) return { prev: null, next: null };
+  return {
+    prev: i > 0 ? rooms[i - 1]! : null,
+    next: i < rooms.length - 1 ? rooms[i + 1]! : null,
+  };
+}

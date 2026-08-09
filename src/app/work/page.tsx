@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { CollectionIndex } from "@/components/CollectionIndex";
 import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
-import { getCollectionPhotos, getPhotos } from "@/lib/photos";
+import {
+  getCollectionPhotos,
+  getFatniCollectionSummaries,
+} from "@/lib/photos";
 import { isAyoubSite, sitePageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -33,13 +37,17 @@ export default async function WorkPage() {
     );
   }
 
-  const photos = await getPhotos();
+  const collections = await getFatniCollectionSummaries();
 
   return (
     <>
       <Header solid />
       <main className="min-h-svh pt-16 sm:pt-20">
-        <Gallery title="Gallery" tightTop items={photos} highlightAfterDark />
+        <CollectionIndex
+          collections={collections}
+          heading="Work"
+          intro="Browse the archive by collection — landscape, cities, street, sky and monochrome."
+        />
       </main>
       <Footer />
     </>

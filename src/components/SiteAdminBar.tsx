@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAdmin } from "@/components/AdminProvider";
+import { isFatniSite } from "@/lib/site";
 
 export function SiteAdminBar() {
   const {
@@ -26,6 +27,8 @@ export function SiteAdminBar() {
     await saveDraft();
   };
 
+  const showLibrary = isFatniSite();
+
   return (
     <>
       <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-line bg-ink/95 px-4 py-3 backdrop-blur-md sm:px-6">
@@ -37,6 +40,14 @@ export function SiteAdminBar() {
             {user.email}
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {showLibrary ? (
+              <Link
+                href="/admin/library"
+                className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
+              >
+                Library
+              </Link>
+            ) : null}
             <Link
               href="/admin/collections"
               className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"

@@ -3,11 +3,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
+import { isFatniSite } from "@/lib/site";
 
 /** Sign-in only — after login you edit on the live site. */
 export function AdminPanel() {
   const configured = hasSupabaseEnv();
   const router = useRouter();
+  const afterLogin = isFatniSite() ? "/admin/library" : "/work";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,16 +22,13 @@ export function AdminPanel() {
   );
 
   useEffect(() => {
-    if (!supabase) {
-      setChecking(false);
-      return;
-    }
+    if (!supabase) return;
     let mounted = true;
     (async () => {
       const { data } = await supabase.auth.getUser();
       if (!mounted) return;
       if (data.user) {
-        router.replace("/work");
+        router.replace(afterLogin);
         return;
       }
       setChecking(false);
@@ -37,7 +36,7 @@ export function AdminPanel() {
     return () => {
       mounted = false;
     };
-  }, [supabase, router]);
+  }, [supabase, router, afterLogin]);
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
@@ -53,7 +52,7 @@ export function AdminPanel() {
       setBusy(false);
       return;
     }
-    router.replace("/work");
+    router.replace(afterLogin);
   };
 
   if (!configured) {

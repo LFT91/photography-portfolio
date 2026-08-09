@@ -25,9 +25,9 @@ export const SITES: Record<SiteId, SiteConfig> = {
     id: "fatni-photography",
     name: "Fatni Photography",
     description:
-      "London-based photographer Ayoub El Fatni — travel, street, and night photography. Shortlisted in the British Photography Awards and Monochrome Photography Awards.",
+      "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, night, and monochrome.",
     ogDescription:
-      "London-based photographer Ayoub El Fatni — travel, street, and night photography.",
+      "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, and night.",
     nav: [
       { href: "/work", label: "Work" },
       { href: "/about", label: "About" },

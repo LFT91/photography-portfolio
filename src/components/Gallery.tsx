@@ -216,24 +216,30 @@ function widthPctForScale(scale: number, span: number) {
   return Math.round((scale / span) * 1000) / 10;
 }
 
-function useGalleryLayout(desktopCols: 2 | 3 = 3) {
-  const [cols, setCols] = useState<1 | 2 | 3>(desktopCols);
+function useGalleryLayout(mode: "fatni" | "ayoub" = "fatni") {
+  const [cols, setCols] = useState<1 | 2 | 3>(mode === "ayoub" ? 2 : 3);
   const [baseCellWidth, setBaseCellWidth] = useState(320);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateCols = () => {
-      // Fatni: 1 → 3 from sm. Ayoub: 1 → 2 from md.
-      const mq =
-        desktopCols === 2
-          ? "(min-width: 768px)"
-          : "(min-width: 640px)";
-      setCols(window.matchMedia(mq).matches ? desktopCols : 1);
+      // Fatni archive: 1 → 2 (md) → 3 (lg). Ayoub: 1 → 2 from md.
+      if (mode === "ayoub") {
+        setCols(window.matchMedia("(min-width: 768px)").matches ? 2 : 1);
+        return;
+      }
+      if (window.matchMedia("(min-width: 1024px)").matches) {
+        setCols(3);
+      } else if (window.matchMedia("(min-width: 768px)").matches) {
+        setCols(2);
+      } else {
+        setCols(1);
+      }
     };
     updateCols();
     window.addEventListener("resize", updateCols);
     return () => window.removeEventListener("resize", updateCols);
-  }, [desktopCols]);
+  }, [mode]);
 
   useEffect(() => {
     const el = galleryRef.current;
@@ -1102,7 +1108,7 @@ export function Gallery({
   /** Show After Dark project link on the far right in ember. */
   highlightAfterDark?: boolean;
   /**
-   * default — Fatni 3-column gallery.
+   * default — Fatni archive 3-column gallery (2 on tablet).
    * ayoub — 2-column editorial on tablet/desktop, wider max width, quieter lightbox.
    */
   presentation?: "default" | "ayoub";
@@ -1117,7 +1123,9 @@ export function Gallery({
     setViewOrder,
   } = useAdmin();
   const ayoub = presentation === "ayoub";
-  const { cols, baseCellWidth, galleryRef } = useGalleryLayout(ayoub ? 2 : 3);
+  const { cols, baseCellWidth, galleryRef } = useGalleryLayout(
+    ayoub ? "ayoub" : "fatni",
+  );
   useDragAutoScroll(editing);
   const source = items ?? photos;
   const [filter, setFilter] = useState<PhotoCategory>(
@@ -1283,7 +1291,7 @@ export function Gallery({
             className={
               ayoub
                 ? "grid grid-cols-1 grid-flow-dense items-start gap-6 md:grid-cols-2 md:gap-6"
-                : "grid grid-cols-1 grid-flow-dense items-start gap-3 sm:grid-cols-3 sm:gap-4"
+                : "grid grid-cols-1 grid-flow-dense items-start gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3"
             }
           >
             {filtered.map((photo, index) => (

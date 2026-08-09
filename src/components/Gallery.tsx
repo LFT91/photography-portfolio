@@ -863,9 +863,12 @@ function GalleryCard({
                   <p className="font-display text-xl italic text-paper">
                     {photo.title}
                   </p>
-                  <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-                    {photo.categories.join(" · ")}
-                  </p>
+                  {/* Ayoub (uniformColumn): title only — no collection membership labels */}
+                  {!uniformColumn ? (
+                    <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+                      {photo.categories.join(" · ")}
+                    </p>
+                  ) : null}
                 </div>
               </button>
             )}

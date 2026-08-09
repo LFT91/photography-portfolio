@@ -21,7 +21,7 @@ export function AfterDark({
   items: Photo[];
   /** Required when items are present; omitted for empty collections. */
   cover?: Photo | null;
-  /** Ayoub gets distinct copy/ENTER; Fatni keeps the original entrance. */
+  /** Ayoub gets distinct copy; Fatni keeps the original entrance gate. */
   variant?: "fatni" | "ayoub";
 }) {
   const [entered, setEntered] = useState(false);
@@ -29,8 +29,9 @@ export function AfterDark({
   const ayoub = variant === "ayoub";
   const statement = ayoub ? AYOUB_STATEMENT : FATNI_STATEMENT;
 
+  // Fatni only: lock scroll until Enter. Ayoub scrolls from intro into gallery.
   useEffect(() => {
-    if (empty) {
+    if (ayoub || empty) {
       document.body.style.overflow = "";
       return;
     }
@@ -38,7 +39,7 @@ export function AfterDark({
     return () => {
       document.body.style.overflow = "";
     };
-  }, [entered, empty]);
+  }, [entered, empty, ayoub]);
 
   if (empty) {
     return (
@@ -66,36 +67,55 @@ export function AfterDark({
     );
   }
 
-  if (!entered && cover && ayoub) {
+  // Ayoub: Night Train introduction then gallery in one scrollable page (no second ENTER).
+  if (ayoub) {
     return (
-      <section className="relative flex h-svh flex-col items-center justify-center overflow-hidden bg-ink">
-        <div className="absolute inset-0 flex items-center justify-center px-3 sm:px-6">
-          <ArtistStagePrint
-            src={cover.src}
-            alt={cover.title}
-            priority
-            mode="width"
-            blend="night"
-          />
-        </div>
+      <div className="min-h-svh bg-ink">
+        {cover ? (
+          <section className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-ink">
+            <div className="absolute inset-0 flex items-center justify-center px-3 sm:px-6">
+              <ArtistStagePrint
+                src={cover.src}
+                alt={cover.title}
+                priority
+                mode="width"
+                blend="night"
+              />
+            </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center px-5 text-center sm:px-8">
-          <h1 className="animate-rise delay-1 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
-            After Dark
-          </h1>
-          <p className="animate-rise delay-2 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
-            {AYOUB_STATEMENT}
-          </p>
-          <button
-            type="button"
-            onClick={() => setEntered(true)}
-            className="animate-rise delay-3 mt-10 inline-flex items-center gap-3 border border-white/55 px-6 py-3 font-brand text-sm tracking-[0.16em] text-white/95 transition-colors hover:border-white hover:text-white sm:text-base"
-          >
-            ENTER
-            <span aria-hidden>→</span>
-          </button>
-        </div>
-      </section>
+            <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center px-5 text-center sm:px-8">
+              <h1 className="animate-rise delay-1 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
+                After Dark
+              </h1>
+              <p className="animate-rise delay-2 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
+                {AYOUB_STATEMENT}
+              </p>
+            </div>
+          </section>
+        ) : (
+          <div className="px-5 pb-2 pt-20 sm:px-8 sm:pt-24">
+            <div className="mx-auto max-w-7xl">
+              <h1 className="font-display text-3xl italic text-paper sm:text-4xl">
+                After Dark
+              </h1>
+              <p className="mt-6 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
+                {AYOUB_STATEMENT}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <Gallery
+          lockedCategory="After Dark"
+          showFilters={false}
+          title=""
+          tightTop
+          items={items}
+          presentation="ayoub"
+        />
+
+        <Footer />
+      </div>
     );
   }
 
@@ -144,29 +164,19 @@ export function AfterDark({
 
   return (
     <div className="animate-fade min-h-svh bg-ink pt-16 sm:pt-20">
-      {!ayoub ? (
-        <div className="border-b border-line px-5 py-10 sm:px-8 sm:py-12">
-          <div className="mx-auto max-w-7xl">
-            <p className="mb-3 font-brand text-sm tracking-[0.28em] text-ember uppercase">
-              Project
-            </p>
-            <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
-              After Dark
-            </h1>
-            <p className="mt-4 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
-              {FATNI_STATEMENT}
-            </p>
-          </div>
+      <div className="border-b border-line px-5 py-10 sm:px-8 sm:py-12">
+        <div className="mx-auto max-w-7xl">
+          <p className="mb-3 font-brand text-sm tracking-[0.28em] text-ember uppercase">
+            Project
+          </p>
+          <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
+            After Dark
+          </h1>
+          <p className="mt-4 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
+            {FATNI_STATEMENT}
+          </p>
         </div>
-      ) : (
-        <div className="px-5 pb-2 pt-6 sm:px-8 sm:pt-8">
-          <div className="mx-auto max-w-7xl">
-            <h1 className="font-display text-3xl italic text-paper sm:text-4xl">
-              After Dark
-            </h1>
-          </div>
-        </div>
-      )}
+      </div>
 
       <Gallery
         lockedCategory="After Dark"
@@ -174,7 +184,7 @@ export function AfterDark({
         title=""
         tightTop
         items={items}
-        presentation={ayoub ? "ayoub" : "default"}
+        presentation="default"
       />
 
       <Footer />

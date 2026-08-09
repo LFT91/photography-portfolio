@@ -29,7 +29,7 @@ export const SITES: Record<SiteId, SiteConfig> = {
     ogDescription:
       "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, and night.",
     nav: [
-      { href: "/work", label: "Work" },
+      { href: "/work", label: "Collections" },
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
     ],

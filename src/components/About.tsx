@@ -1,8 +1,14 @@
 import { ProtectedImage } from "@/components/ProtectedImage";
 import { isAyoubSite } from "@/lib/site";
 
+const FATNI_SITE_URL = "https://fatni-photography.vercel.app";
+const AYOUB_SITE_URL = "https://ayoub-el-fatni.vercel.app";
+
 const awardClassName =
   "font-medium text-paper underline decoration-ember/70 decoration-1 underline-offset-4";
+
+const sisterLinkClassName =
+  "text-fog transition-colors hover:text-paper-dim hover:underline hover:underline-offset-4";
 
 function AwardNames() {
   return (
@@ -53,6 +59,12 @@ function FatniAbout() {
           <p className="font-brand text-base leading-relaxed text-paper-dim sm:text-lg">
             My work has been shortlisted for the <AwardNames />.
           </p>
+          <p className="!mt-12 font-brand text-sm leading-relaxed text-fog sm:!mt-14">
+            For focused work, visit{" "}
+            <a href={AYOUB_SITE_URL} className={sisterLinkClassName}>
+              Ayoub El Fatni →
+            </a>
+          </p>
         </div>
       </div>
     </section>
@@ -81,6 +93,12 @@ function AyoubAbout() {
           <p className="font-brand text-base leading-[1.75] text-paper-dim sm:text-[1.05rem]">
             He began photographing in 2017. His work has been shortlisted for
             the <AwardNames />.
+          </p>
+          <p className="!mt-12 font-brand text-sm leading-[1.75] text-fog sm:!mt-14">
+            For broader photographic work, visit{" "}
+            <a href={FATNI_SITE_URL} className={sisterLinkClassName}>
+              Fatni Photography →
+            </a>
           </p>
         </div>
       </div>

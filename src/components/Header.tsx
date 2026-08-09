@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { getActiveSite, isAyoubSite } from "@/lib/site";
 
@@ -29,7 +29,7 @@ export function Header({ solid = false }: { solid?: boolean }) {
   }, []);
 
   useEffect(() => {
-    setOpen(false);
+    startTransition(() => setOpen(false));
   }, [pathname]);
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export function Header({ solid = false }: { solid?: boolean }) {
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
-              className="font-display text-3xl italic text-paper sm:text-4xl"
+              className="px-4 py-3 font-display text-3xl italic text-paper sm:text-4xl"
             >
               {link.label}
             </Link>

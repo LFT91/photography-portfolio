@@ -82,3 +82,12 @@ export function sitePageTitle(page?: string): string {
   const { name } = getActiveSite();
   return page ? `${page} | ${name}` : name;
 }
+
+/** Canonical public origin for this deployment (OG, sitemap, robots). */
+export function getPublicSiteUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  return isAyoubSite()
+    ? "https://ayoub-el-fatni.vercel.app"
+    : "https://fatni-photography.vercel.app";
+}

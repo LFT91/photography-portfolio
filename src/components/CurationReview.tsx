@@ -139,6 +139,8 @@ type Props = {
   sites: SiteOption[];
   collections: CollectionOption[];
   loadError: string | null;
+  /** Vercel preview for feature/curation-review only — no admin session required. */
+  readOnlyPreview?: boolean;
 };
 
 export function CurationReview({
@@ -146,6 +148,7 @@ export function CurationReview({
   sites,
   collections,
   loadError,
+  readOnlyPreview = false,
 }: Props) {
   const { ready, user } = useAdmin();
   const router = useRouter();
@@ -196,9 +199,10 @@ export function CurationReview({
   );
 
   useEffect(() => {
+    if (readOnlyPreview) return;
     if (!ready) return;
     if (!user) router.replace("/admin");
-  }, [ready, user, router]);
+  }, [readOnlyPreview, ready, user, router]);
 
   // Drop selected photo from URL if it falls outside the active filter.
   useEffect(() => {
@@ -268,7 +272,7 @@ export function CurationReview({
     URL.revokeObjectURL(url);
   };
 
-  if (!ready || !user) {
+  if (!readOnlyPreview && (!ready || !user)) {
     return (
       <div className="mx-auto max-w-3xl px-5 py-24 text-center font-brand text-paper-dim">
         Checking session…
@@ -278,10 +282,20 @@ export function CurationReview({
 
   return (
     <div className="mx-auto max-w-[90rem] px-5 py-12 sm:px-8 sm:py-16">
+      {readOnlyPreview ? (
+        <p
+          role="status"
+          className="mb-6 border border-ember/50 bg-ember/10 px-4 py-3 font-brand text-sm tracking-[0.04em] text-ember"
+        >
+          Read-only preview — unauthenticated access on this Vercel preview
+          branch only. No edits.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-brand text-xs tracking-[0.14em] text-ember uppercase">
-            Admin · read-only
+            {readOnlyPreview ? "Read-only preview" : "Admin · read-only"}
           </p>
           <h1 className="mt-2 font-display text-4xl italic text-paper sm:text-5xl">
             Curation review
@@ -300,12 +314,14 @@ export function CurationReview({
           >
             Export current manifest
           </button>
-          <Link
-            href="/admin/collections"
-            className="border border-line px-4 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
-          >
-            Collections
-          </Link>
+          {!readOnlyPreview ? (
+            <Link
+              href="/admin/collections"
+              className="border border-line px-4 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
+            >
+              Collections
+            </Link>
+          ) : null}
         </div>
       </div>
 

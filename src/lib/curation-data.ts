@@ -2,6 +2,7 @@ import {
   buildCurationPhoto,
   type CurationPhoto,
 } from "@/lib/curation";
+import type { DryRunLiveSnapshot } from "@/lib/curation-dry-run";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type PhotoRow = {
@@ -78,6 +79,7 @@ export async function loadCurationPhotos(
   const byPhoto = new Map<
     string,
     {
+      membershipId: string;
       collectionId: string;
       siteId: string;
       slug: string;
@@ -89,8 +91,11 @@ export async function loadCurationPhotos(
   for (const row of (membershipsRes.data ?? []) as MembershipRow[]) {
     const collection = unwrapCollection(row.collection);
     if (!collection?.id) continue;
+    // collection_photos has no surrogate id — composite (collection_id, photo_id) is the stable row identity.
+    const membershipId = `${collection.id}:${row.photo_id}`;
     const list = byPhoto.get(row.photo_id) ?? [];
     list.push({
+      membershipId,
       collectionId: collection.id,
       siteId: collection.site_id,
       slug: collection.slug,
@@ -161,5 +166,43 @@ export async function loadCurationFilterOptions(
       sortOrder: c.sort_order as number,
     })),
     error: null,
+  };
+}
+
+/** Read-only snapshot for Phase 3 dry-run planning. */
+export function toDryRunLiveSnapshot(
+  photos: CurationPhoto[],
+  collections: CollectionOption[],
+): DryRunLiveSnapshot {
+  const memberships = photos.flatMap((photo) =>
+    photo.memberships
+      .filter((m) => Boolean(m.membershipId))
+      .map((m) => ({
+        id: m.membershipId as string,
+        photo_id: photo.id,
+        collection_id: m.collectionId,
+        sort_order: m.sortOrder,
+        collection: {
+          id: m.collectionId,
+          title: m.title,
+          slug: m.slug,
+          site_id: m.siteId,
+        },
+      })),
+  );
+
+  return {
+    photos: photos.map((p) => ({
+      id: p.id,
+      title: p.title,
+      storage_path: p.storagePath,
+    })),
+    memberships,
+    collections: collections.map((c) => ({
+      id: c.id,
+      site_id: c.siteId,
+      title: c.title,
+      slug: c.slug,
+    })),
   };
 }

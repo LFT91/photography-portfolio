@@ -29,6 +29,8 @@ export type CurationFilter =
   | "needs_title";
 
 export type CurationMembership = {
+  /** collection_photos.id when loaded from live rows; optional for diagnostics-only shapes. */
+  membershipId?: string;
   collectionId: string;
   siteId: string;
   slug: string;

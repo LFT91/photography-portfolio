@@ -22,10 +22,13 @@ import {
   createWorkingDecisions,
   destinationLabel,
   filterWorkingDecisions,
+  fingerprintDecisions,
   loadPersistedState,
   parseAndValidateManifest,
   parseProposalFilter,
+  proposedPositionLabel,
   savePersistedState,
+  sha256HexAsync,
   storageKeyForManifest,
   summarizeProposals,
   validateProposalFields,
@@ -36,6 +39,8 @@ import {
   type WorkingDecision,
   type WorkingProposal,
 } from "@/lib/curation-proposals";
+import { planCurationDryRun } from "@/lib/curation-dry-run";
+import { toDryRunLiveSnapshot } from "@/lib/curation-data";
 
 function siteLabel(siteId: string, sites: SiteOption[]) {
   return sites.find((s) => s.id === siteId)?.name ?? siteId;
@@ -140,6 +145,8 @@ type Props = {
 type SessionState = {
   manifest: ImportedProposalManifest;
   storageKey: string;
+  contentFingerprint: string;
+  manifestSha256: string;
   decisions: WorkingDecision[];
 };
 
@@ -180,6 +187,7 @@ function PhotoLightboxImage({
 export function CurationProposalReview({
   photos,
   sites,
+  collections,
   readOnlyPreview = false,
   onSwitchToAudit,
 }: Props) {
@@ -234,6 +242,7 @@ export function CurationProposalReview({
     savePersistedState({
       version: 1,
       storageKey: next.storageKey,
+      contentFingerprint: next.contentFingerprint,
       decisions: next.decisions,
     });
   }, []);
@@ -249,6 +258,7 @@ export function CurationProposalReview({
         savePersistedState({
           version: 1,
           storageKey: next.storageKey,
+          contentFingerprint: next.contentFingerprint,
           decisions: next.decisions,
         });
         return next;
@@ -267,7 +277,6 @@ export function CurationProposalReview({
         let proposal: WorkingProposal = {
           ...d.proposal,
           ...proposalPatch,
-          sort_order: null,
         };
 
         if (patch.publication === "hold") {
@@ -276,6 +285,7 @@ export function CurationProposalReview({
             publication: "hold",
             site_id: null,
             collection_slug: null,
+            sort_order: null,
           };
         }
 
@@ -289,7 +299,10 @@ export function CurationProposalReview({
               dest.siteId === proposal.site_id &&
               dest.slug === proposal.collection_slug,
           );
-          if (!stillValid) proposal.collection_slug = null;
+          if (!stillValid) {
+            proposal.collection_slug = null;
+            proposal.sort_order = null;
+          }
         }
 
         const err = validateProposalFields(proposal);
@@ -328,10 +341,14 @@ export function CurationProposalReview({
         return;
       }
 
-      const key = storageKeyForManifest(result.manifest);
+      const contentFingerprint =
+        result.contentFingerprint || fingerprintDecisions(result.decisions);
+      const manifestSha256 = await sha256HexAsync(text);
+      const key = storageKeyForManifest(result.manifest, contentFingerprint);
       const persisted = loadPersistedState(key);
       const decisions =
         persisted &&
+        persisted.contentFingerprint === contentFingerprint &&
         persisted.decisions.length === result.decisions.length &&
         new Set(persisted.decisions.map((d) => d.photo_id)).size ===
           result.decisions.length
@@ -341,6 +358,8 @@ export function CurationProposalReview({
       const next: SessionState = {
         manifest: result.manifest,
         storageKey: key,
+        contentFingerprint,
+        manifestSha256,
         decisions,
       };
       persist(next);
@@ -463,7 +482,7 @@ export function CurationProposalReview({
     updateDecision(photoId, (d) => ({
       photo_id: d.photo_id,
       original: d.original,
-      proposal: { ...d.original.proposal, sort_order: null },
+      proposal: { ...d.original.proposal },
       reviewer_note: "",
     }));
     setFieldError(null);
@@ -481,6 +500,31 @@ export function CurationProposalReview({
     a.download = `curation-proposals-working-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportDryRun = () => {
+    if (!session) return;
+    const live = toDryRunLiveSnapshot(photos, collections);
+    const report = planCurationDryRun({
+      manifest: session.manifest,
+      workingDecisions: session.decisions,
+      live,
+      manifestSha256: session.manifestSha256,
+    });
+    const blob = new Blob([JSON.stringify(report, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `curation-apply-dry-run-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    if (!report.pass) {
+      window.alert(
+        `Dry run failed closed (${report.errors.length} error(s)). A non-executable report was downloaded.`,
+      );
+    }
   };
 
   const batchApproveFiltered = () => {
@@ -567,6 +611,13 @@ export function CurationProposalReview({
                 className="border border-ember px-4 py-2 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10"
               >
                 Export working manifest
+              </button>
+              <button
+                type="button"
+                onClick={exportDryRun}
+                className="border border-ember px-4 py-2 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10"
+              >
+                Export apply dry run
               </button>
               <button
                 type="button"
@@ -793,6 +844,11 @@ export function CurationProposalReview({
                           decision.proposal.site_id,
                           decision.proposal.collection_slug,
                         )}
+                        {proposedPositionLabel(decision, filtered)
+                          ? ` · ${proposedPositionLabel(decision, filtered)}`
+                          : typeof decision.proposal.sort_order === "number"
+                            ? ` · #${decision.proposal.sort_order}`
+                            : ""}
                       </p>
                       <p className="line-clamp-2 font-brand text-xs text-paper/60">
                         {decision.original.reason}
@@ -1092,7 +1148,10 @@ export function CurationProposalReview({
                   <p className="font-brand text-xs tracking-[0.1em] text-fog uppercase">
                     Related photograph
                   </p>
-                  <p className="mt-1 font-brand text-sm text-paper/70">
+                  <p className="mt-1 break-all font-mono text-xs text-fog">
+                    {selected.original.related_photo_id}
+                  </p>
+                  <p className="mt-1 font-brand text-sm text-paper/70 capitalize">
                     {selected.original.relationship?.replace(/_/g, " ") ??
                       "Related"}
                   </p>
@@ -1106,6 +1165,13 @@ export function CurationProposalReview({
                     Compare related photographs
                   </button>
                 </div>
+              ) : null}
+
+              {proposedPositionLabel(selected, filtered) ? (
+                <p className="mt-4 font-brand text-sm text-ember tabular-nums">
+                  Proposed position{" "}
+                  {proposedPositionLabel(selected, filtered)}
+                </p>
               ) : null}
 
               <div className="mt-auto flex flex-wrap gap-2 pt-6">
@@ -1301,14 +1367,14 @@ function mergePersisted(
       return {
         photo_id: original.photo_id,
         original,
-        proposal: { ...original.proposal, sort_order: null },
+        proposal: { ...original.proposal },
         reviewer_note: "",
       };
     }
     return {
       photo_id: original.photo_id,
       original,
-      proposal: { ...existing.proposal, sort_order: null },
+      proposal: { ...existing.proposal },
       reviewer_note: existing.reviewer_note ?? "",
     };
   });

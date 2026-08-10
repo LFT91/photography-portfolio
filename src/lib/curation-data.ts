@@ -255,7 +255,12 @@ export async function loadCollectionPhotosIdentitySchema(
     ]
       .filter(Boolean)
       .join(" "),
-    migration_ddl: { ...COLLECTION_PHOTOS_MIGRATION_DDL },
+    migration_ddl: {
+      found: COLLECTION_PHOTOS_MIGRATION_DDL.found,
+      constraint_type: COLLECTION_PHOTOS_MIGRATION_DDL.constraint_type,
+      columns: [...COLLECTION_PHOTOS_MIGRATION_DDL.columns],
+      source: COLLECTION_PHOTOS_MIGRATION_DDL.source,
+    },
   };
 }
 

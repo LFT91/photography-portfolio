@@ -267,14 +267,15 @@ export function toManifestEntry(photo: CurationPhoto): CurationManifestEntry {
 }
 
 export function parseCurationFilter(value: string | null | undefined): CurationFilter {
-  switch (value) {
+  const normalized = (value ?? "").trim().toLowerCase().replace(/-/g, "_");
+  switch (normalized) {
     case "unassigned":
     case "assigned_once":
     case "duplicate":
     case "cross_site":
     case "retired":
     case "needs_title":
-      return value;
+      return normalized;
     default:
       return "all";
   }

@@ -6,10 +6,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
 } from "react";
 import { useAdmin } from "@/components/AdminProvider";
+import { CurationProposalReview } from "@/components/CurationProposalReview";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import {
   filterCurationPhotos,
@@ -134,6 +136,40 @@ function MembershipList({
   );
 }
 
+function PhotoLightboxImage({
+  photo,
+  priority,
+}: {
+  photo: CurationPhoto;
+  priority?: boolean;
+}) {
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const loaded = loadedId === photo.id;
+
+  return (
+    <div className="relative min-h-[40vh] bg-ink-soft lg:min-h-[70vh]">
+      {!loaded ? (
+        <div
+          className="absolute inset-0 z-[1] flex items-center justify-center bg-ink-soft"
+          aria-live="polite"
+        >
+          <p className="font-brand text-sm text-fog">Loading image…</p>
+        </div>
+      ) : null}
+      <ProtectedImage
+        key={photo.id}
+        src={photo.publicUrl}
+        alt={photo.title || "Photograph"}
+        fill
+        sizes="(max-width: 1024px) 100vw, 60vw"
+        className={`object-contain transition-opacity ${loaded ? "opacity-100" : "opacity-0"}`}
+        priority={priority}
+        onLoad={() => setLoadedId(photo.id)}
+      />
+    </div>
+  );
+}
+
 type Props = {
   photos: CurationPhoto[];
   sites: SiteOption[];
@@ -155,10 +191,13 @@ export function CurationReview({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const mode = searchParams.get("mode") === "proposals" ? "proposals" : "audit";
   const filter = parseCurationFilter(searchParams.get("filter"));
   const siteId = searchParams.get("site");
   const collectionId = searchParams.get("collection");
   const selectedId = searchParams.get("photo");
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openTriggerRef = useRef<HTMLElement | null>(null);
 
   const summary = useMemo(() => summarizeCuration(photos), [photos]);
 
@@ -221,13 +260,22 @@ export function CurationReview({
   }, [collectionId, siteId, collections, replaceQuery]);
 
   const openPhoto = useCallback(
-    (id: string) => replaceQuery({ photo: id }),
+    (id: string, trigger?: HTMLElement | null) => {
+      if (trigger) openTriggerRef.current = trigger;
+      replaceQuery({ photo: id });
+    },
     [replaceQuery],
   );
-  const closePhoto = useCallback(
-    () => replaceQuery({ photo: null }),
-    [replaceQuery],
-  );
+  const closePhoto = useCallback(() => {
+    replaceQuery({ photo: null });
+    queueMicrotask(() => openTriggerRef.current?.focus());
+  }, [replaceQuery]);
+
+  useEffect(() => {
+    if (!selectedId || !selected) return;
+    queueMicrotask(() => closeButtonRef.current?.focus());
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps -- focus only when opened photo changes
+
 
   const goRelative = useCallback(
     (delta: number) => {
@@ -280,6 +328,20 @@ export function CurationReview({
     );
   }
 
+  if (mode === "proposals") {
+    return (
+      <CurationProposalReview
+        photos={photos}
+        sites={sites}
+        collections={collections}
+        readOnlyPreview={readOnlyPreview}
+        onSwitchToAudit={() => {
+          router.replace(pathname, { scroll: false });
+        }}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto max-w-[90rem] px-5 py-12 sm:px-8 sm:py-16">
       {readOnlyPreview ? (
@@ -309,8 +371,15 @@ export function CurationReview({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={exportManifest}
+            onClick={() => replaceQuery({ mode: "proposals", filter: null, site: null, collection: null, photo: null })}
             className="border border-ember px-4 py-2 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10"
+          >
+            Proposal review
+          </button>
+          <button
+            type="button"
+            onClick={exportManifest}
+            className="border border-line px-4 py-2 font-brand text-sm tracking-[0.06em] text-paper-dim transition-colors hover:text-paper"
           >
             Export current manifest
           </button>
@@ -413,7 +482,7 @@ export function CurationReview({
               <article className="flex h-full flex-col border border-line bg-ink-soft/30 transition-colors hover:border-paper/40">
                 <button
                   type="button"
-                  onClick={() => openPhoto(photo.id)}
+                  onClick={(e) => openPhoto(photo.id, e.currentTarget)}
                   aria-label={openLabel}
                   className="relative aspect-[4/3] w-full overflow-hidden bg-ink text-left outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
                 >
@@ -429,7 +498,7 @@ export function CurationReview({
                   <div className="flex items-start justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => openPhoto(photo.id)}
+                      onClick={(e) => openPhoto(photo.id, e.currentTarget)}
                       aria-label={openLabel}
                       className="min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
                     >
@@ -481,16 +550,7 @@ export function CurationReview({
             className="relative grid max-h-[min(92vh,56rem)] w-full max-w-6xl overflow-hidden border border-line bg-ink lg:grid-cols-[1.4fr_1fr]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative min-h-[40vh] bg-ink-soft lg:min-h-[70vh]">
-              <ProtectedImage
-                src={selected.publicUrl}
-                alt={selected.title}
-                fill
-                sizes="(max-width: 1024px) 100vw, 60vw"
-                className="object-contain"
-                priority
-              />
-            </div>
+            <PhotoLightboxImage photo={selected} priority />
             <div className="flex max-h-[min(92vh,56rem)] flex-col overflow-y-auto p-5 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -502,6 +562,7 @@ export function CurationReview({
                   </h2>
                 </div>
                 <button
+                  ref={closeButtonRef}
                   type="button"
                   onClick={closePhoto}
                   className="border border-line px-3 py-1.5 font-brand text-sm text-paper-dim hover:text-paper"

@@ -54,6 +54,12 @@ export function SiteAdminBar() {
             >
               Collections
             </Link>
+            <Link
+              href="/admin/curation-review"
+              className="border border-line px-3 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
+            >
+              Curation
+            </Link>
             {!editing ? (
               <button
                 type="button"

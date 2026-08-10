@@ -39,12 +39,22 @@ export type DryRunLiveCollection = {
 
 export type MembershipIdentitySchemaInfo = {
   identity_model: "collection_id:photo_id";
-  /** true/false when introspection succeeded; null when schema could not be read. */
+  /** true/false when live introspection succeeded; null when schema could not be read. */
   composite_unique_or_pk_found: boolean | null;
   constraint_name: string | null;
   constraint_type: string | null;
   columns: string[];
   detail: string;
+  /**
+   * Corroborating evidence from checked-in migration DDL when live
+   * information_schema / OpenAPI queries are unavailable to the anon client.
+   */
+  migration_ddl?: {
+    found: boolean;
+    constraint_type: string;
+    columns: string[];
+    source: string;
+  } | null;
 };
 
 export type DryRunLiveSnapshot = {

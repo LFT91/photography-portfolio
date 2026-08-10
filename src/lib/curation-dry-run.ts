@@ -16,6 +16,7 @@ export type DryRunLivePhoto = {
   storage_path: string;
 };
 
+/** Stable identity is always `collection_id:photo_id` (no surrogate PK). */
 export type DryRunLiveMembership = {
   id: string;
   photo_id: string;
@@ -36,10 +37,21 @@ export type DryRunLiveCollection = {
   slug: string;
 };
 
+export type MembershipIdentitySchemaInfo = {
+  identity_model: "collection_id:photo_id";
+  /** true/false when introspection succeeded; null when schema could not be read. */
+  composite_unique_or_pk_found: boolean | null;
+  constraint_name: string | null;
+  constraint_type: string | null;
+  columns: string[];
+  detail: string;
+};
+
 export type DryRunLiveSnapshot = {
   photos: DryRunLivePhoto[];
   memberships: DryRunLiveMembership[];
   collections: DryRunLiveCollection[];
+  membership_identity_schema?: MembershipIdentitySchemaInfo | null;
 };
 
 export type DryRunTitleUpdate = {
@@ -103,8 +115,18 @@ export type DryRunPhotoRecord = {
 
 export type CurationDryRunReport = {
   generated_at: string;
-  manifest_sha256: string;
+  /** SHA-256 of the exact uploaded manifest file bytes (before JSON.parse). */
+  input_file_sha256: string;
+  /** SHA-256 of the normalized decision fingerprint payload. */
+  decision_fingerprint_sha256: string;
   executable: false;
+  membership_identity: {
+    model: "collection_id:photo_id";
+    current_composite_count: number;
+    current_composites_unique: boolean;
+    retains_and_deletes_partition_current: boolean;
+    schema: MembershipIdentitySchemaInfo | null;
+  };
   source: {
     live_photo_count: number;
     live_membership_count: number;
@@ -130,6 +152,13 @@ export type CurationDryRunReport = {
   errors: string[];
 };
 
+export function compositeMembershipId(
+  collectionId: string,
+  photoId: string,
+): string {
+  return `${collectionId}:${photoId}`;
+}
+
 function resolveDestinations(
   collections: DryRunLiveCollection[],
 ): { ok: true; map: Map<string, DryRunLiveCollection> } | { ok: false; errors: string[] } {
@@ -152,6 +181,78 @@ function resolveDestinations(
   return { ok: true, map };
 }
 
+function validateCurrentComposites(
+  memberships: DryRunLiveMembership[],
+): { ok: true } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  for (const m of memberships) {
+    const expected = compositeMembershipId(m.collection_id, m.photo_id);
+    if (m.id !== expected) {
+      errors.push(
+        `Membership identity must be collection_id:photo_id (got ${m.id}, expected ${expected}).`,
+      );
+    }
+    if (seen.has(m.id)) {
+      errors.push(`Duplicate composite membership identity ${m.id}.`);
+    }
+    seen.add(m.id);
+  }
+  if (errors.length) return { ok: false, errors };
+  return { ok: true };
+}
+
+function partitionCurrentMemberships(
+  current: DryRunLiveMembership[],
+  retains: DryRunMembershipRetain[],
+  deletes: DryRunMembershipDelete[],
+): { ok: boolean; detail: string } {
+  const currentIds = new Set(current.map((m) => m.id));
+  const retainIds = retains.map((r) => r.membership_id);
+  const deleteIds = deletes.map((d) => d.membership_id);
+  const retainSet = new Set(retainIds);
+  const deleteSet = new Set(deleteIds);
+
+  if (retainIds.length !== retainSet.size) {
+    return { ok: false, detail: "Duplicate membership_id in retains." };
+  }
+  if (deleteIds.length !== deleteSet.size) {
+    return { ok: false, detail: "Duplicate membership_id in deletes." };
+  }
+
+  for (const id of retainSet) {
+    if (deleteSet.has(id)) {
+      return { ok: false, detail: `Membership ${id} appears in both retain and delete.` };
+    }
+    if (!currentIds.has(id)) {
+      return { ok: false, detail: `Retain ${id} is not a current composite.` };
+    }
+  }
+  for (const id of deleteSet) {
+    if (!currentIds.has(id)) {
+      return { ok: false, detail: `Delete ${id} is not a current composite.` };
+    }
+  }
+
+  const covered = retainSet.size + deleteSet.size;
+  if (covered !== currentIds.size) {
+    return {
+      ok: false,
+      detail: `Retains+deletes cover ${covered} of ${currentIds.size} current memberships.`,
+    };
+  }
+  for (const id of currentIds) {
+    if (!retainSet.has(id) && !deleteSet.has(id)) {
+      return { ok: false, detail: `Current membership ${id} was not classified.` };
+    }
+  }
+
+  return {
+    ok: true,
+    detail: `Partitioned ${currentIds.size} current composites exactly once (${retainSet.size} retain / ${deleteSet.size} delete).`,
+  };
+}
+
 /**
  * Pure read-only planner. Never mutates anything.
  */
@@ -159,7 +260,8 @@ export function planCurationDryRun(input: {
   manifest: ImportedProposalManifest;
   workingDecisions: WorkingDecision[];
   live: DryRunLiveSnapshot;
-  manifestSha256: string;
+  inputFileSha256: string;
+  decisionFingerprintSha256: string;
   generatedAt?: string;
 }): CurationDryRunReport {
   const errors: string[] = [];
@@ -250,18 +352,28 @@ export function planCurationDryRun(input: {
       : destResolved.errors.join("; "),
   });
 
-  for (const m of input.live.memberships) {
-    if (!m.id) {
-      errors.push(
-        `Membership row missing stable ID for photo ${m.photo_id} / collection ${m.collection_id}.`,
-      );
-    }
+  const compositeCheck = validateCurrentComposites(input.live.memberships);
+  if (!compositeCheck.ok) {
+    errors.push(...compositeCheck.errors);
   }
   drift_checks.push({
-    name: "membership_rows_have_ids",
-    ok: input.live.memberships.every((m) => Boolean(m.id)),
-    detail: "Every collection_photos row must expose id.",
+    name: "membership_composite_identity",
+    ok: compositeCheck.ok,
+    detail: compositeCheck.ok
+      ? `Stable identity collection_id:photo_id; ${input.live.memberships.length} unique composites.`
+      : compositeCheck.errors.slice(0, 3).join("; "),
   });
+
+  const schema = input.live.membership_identity_schema ?? null;
+  drift_checks.push({
+    name: "membership_composite_schema",
+    ok: schema != null,
+    detail: schema
+      ? `${schema.detail} (found=${String(schema.composite_unique_or_pk_found)})`
+      : "Schema introspection not provided.",
+  });
+  // Schema introspection failure is reported but does not alone block planning
+  // when live composites are unique; still surface in membership_identity.
 
   const title_updates: DryRunTitleUpdate[] = [];
   const membership_retains: DryRunMembershipRetain[] = [];
@@ -279,8 +391,9 @@ export function planCurationDryRun(input: {
   }
 
   const finalMembershipKeys = new Set<string>();
+  let duplicateFinal = false;
 
-  if (destResolved.ok && validation.ok && errors.length === 0) {
+  if (destResolved.ok && validation.ok && compositeCheck.ok && errors.length === 0) {
     for (const w of input.workingDecisions) {
       const live = photoById.get(w.photo_id);
       if (!live) continue;
@@ -341,9 +454,11 @@ export function planCurationDryRun(input: {
         continue;
       }
 
-      const finalKey = `${w.photo_id}::${dest.id}`;
+      const finalKey = `${w.photo_id}`;
       if (finalMembershipKeys.has(finalKey)) {
-        errors.push(`Duplicate final membership for ${w.photo_id}.`);
+        duplicateFinal = true;
+        errors.push(`Duplicate final membership for photo ${w.photo_id}.`);
+        continue;
       }
       finalMembershipKeys.add(finalKey);
 
@@ -351,6 +466,13 @@ export function planCurationDryRun(input: {
         (m) => m.collection_id === dest.id,
       );
       const others = beforeMemberships.filter((m) => m.collection_id !== dest.id);
+
+      if (matching.length > 1) {
+        errors.push(
+          `Duplicate composite membership for ${compositeMembershipId(dest.id, w.photo_id)}.`,
+        );
+        continue;
+      }
 
       for (const m of others) {
         membership_deletes.push({
@@ -380,7 +502,7 @@ export function planCurationDryRun(input: {
         } else {
           retained_already_at_final_order += 1;
         }
-      } else if (matching.length === 0) {
+      } else {
         membership_inserts.push({
           photo_id: w.photo_id,
           collection_id: dest.id,
@@ -388,34 +510,6 @@ export function planCurationDryRun(input: {
           site_id: dest.site_id,
           collection_slug: dest.slug,
         });
-      } else {
-        // Ambiguous duplicate memberships to same collection — delete extras, retain one
-        const [keep, ...dupes] = matching;
-        membership_retains.push({
-          membership_id: keep.id,
-          photo_id: w.photo_id,
-          collection_id: dest.id,
-          final_sort_order: w.proposal.sort_order,
-        });
-        if (keep.sort_order !== w.proposal.sort_order) {
-          sort_order_updates.push({
-            membership_id: keep.id,
-            photo_id: w.photo_id,
-            collection_id: dest.id,
-            from_sort_order: keep.sort_order,
-            to_sort_order: w.proposal.sort_order,
-          });
-        } else {
-          retained_already_at_final_order += 1;
-        }
-        for (const m of dupes) {
-          membership_deletes.push({
-            membership_id: m.id,
-            photo_id: w.photo_id,
-            collection_id: m.collection_id,
-            reason: "duplicate_membership_same_collection",
-          });
-        }
       }
 
       photo_records.push({
@@ -443,6 +537,26 @@ export function planCurationDryRun(input: {
     }
   }
 
+  const partition = partitionCurrentMemberships(
+    input.live.memberships,
+    membership_retains,
+    membership_deletes,
+  );
+  const classifiedAny =
+    membership_retains.length + membership_deletes.length > 0;
+  if (classifiedAny && !partition.ok) {
+    errors.push(partition.detail);
+  }
+  drift_checks.push({
+    name: "membership_retain_delete_partition",
+    ok: classifiedAny ? partition.ok : errors.length > 0,
+    detail: classifiedAny
+      ? partition.detail
+      : errors.length > 0
+        ? "Partition skipped — earlier validation failures."
+        : partition.detail,
+  });
+
   const summary = deriveManifestSummary(input.workingDecisions);
   const finalMembershipRows =
     membership_retains.length + membership_inserts.length;
@@ -453,12 +567,13 @@ export function planCurationDryRun(input: {
   invariants.push({
     name: "one_photo_one_membership_or_hold",
     ok:
+      !duplicateFinal &&
       summary.publish === finalMembershipRows &&
       summary.hold ===
         input.workingDecisions.filter((d) => d.proposal.publication === "hold")
           .length &&
       finalMembershipKeys.size === summary.publish,
-    detail: `publish=${summary.publish} final_rows=${finalMembershipRows}`,
+    detail: `publish=${summary.publish} final_rows=${finalMembershipRows} unique_photos=${finalMembershipKeys.size}`,
   });
   invariants.push({
     name: "reconciliation_equation",
@@ -471,6 +586,11 @@ export function planCurationDryRun(input: {
     detail: validation.ok
       ? validation.sequencingMode
       : "manifest sequencing invalid",
+  });
+  invariants.push({
+    name: "final_photo_membership_unique",
+    ok: !duplicateFinal && finalMembershipKeys.size === summary.publish,
+    detail: `unique final photos=${finalMembershipKeys.size}`,
   });
 
   if (!equationOk) {
@@ -485,13 +605,23 @@ export function planCurationDryRun(input: {
 
   const pass =
     errors.length === 0 &&
-    drift_checks.every((c) => c.ok) &&
+    drift_checks
+      .filter((c) => c.name !== "membership_composite_schema")
+      .every((c) => c.ok) &&
     invariants.every((i) => i.ok);
 
   const report: CurationDryRunReport = {
     generated_at: input.generatedAt ?? new Date().toISOString(),
-    manifest_sha256: input.manifestSha256,
+    input_file_sha256: input.inputFileSha256,
+    decision_fingerprint_sha256: input.decisionFingerprintSha256,
     executable: false,
+    membership_identity: {
+      model: "collection_id:photo_id",
+      current_composite_count: input.live.memberships.length,
+      current_composites_unique: compositeCheck.ok,
+      retains_and_deletes_partition_current: partition.ok,
+      schema,
+    },
     source: {
       live_photo_count: livePhotoCount,
       live_membership_count: liveMembershipCount,
@@ -519,7 +649,6 @@ export function planCurationDryRun(input: {
     errors,
   };
 
-  // Fail closed: no executable plan payload when pass is false
   if (!pass) {
     return {
       ...report,

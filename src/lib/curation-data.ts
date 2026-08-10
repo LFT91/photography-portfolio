@@ -2,7 +2,11 @@ import {
   buildCurationPhoto,
   type CurationPhoto,
 } from "@/lib/curation";
-import type { DryRunLiveSnapshot } from "@/lib/curation-dry-run";
+import {
+  compositeMembershipId,
+  type DryRunLiveSnapshot,
+  type MembershipIdentitySchemaInfo,
+} from "@/lib/curation-dry-run";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type PhotoRow = {
@@ -92,7 +96,7 @@ export async function loadCurationPhotos(
     const collection = unwrapCollection(row.collection);
     if (!collection?.id) continue;
     // collection_photos has no surrogate id — composite (collection_id, photo_id) is the stable row identity.
-    const membershipId = `${collection.id}:${row.photo_id}`;
+    const membershipId = compositeMembershipId(collection.id, row.photo_id);
     const list = byPhoto.get(row.photo_id) ?? [];
     list.push({
       membershipId,
@@ -173,6 +177,7 @@ export async function loadCurationFilterOptions(
 export function toDryRunLiveSnapshot(
   photos: CurationPhoto[],
   collections: CollectionOption[],
+  membershipIdentitySchema?: MembershipIdentitySchemaInfo | null,
 ): DryRunLiveSnapshot {
   const memberships = photos.flatMap((photo) =>
     photo.memberships
@@ -204,5 +209,97 @@ export function toDryRunLiveSnapshot(
       title: c.title,
       slug: c.slug,
     })),
+    membership_identity_schema: membershipIdentitySchema ?? null,
   };
+}
+
+/**
+ * Read-only introspection: does a PK/UNIQUE cover (collection_id, photo_id)?
+ * Uses information_schema when accessible; never mutates.
+ */
+export async function loadCollectionPhotosIdentitySchema(
+  supabase: SupabaseClient,
+): Promise<MembershipIdentitySchemaInfo> {
+  const base: MembershipIdentitySchemaInfo = {
+    identity_model: "collection_id:photo_id",
+    composite_unique_or_pk_found: null,
+    constraint_name: null,
+    constraint_type: null,
+    columns: [],
+    detail: "Schema introspection unavailable.",
+  };
+
+  try {
+    const info = supabase.schema("information_schema");
+    const { data: constraints, error: cErr } = await info
+      .from("table_constraints")
+      .select("constraint_name, constraint_type")
+      .eq("table_schema", "public")
+      .eq("table_name", "collection_photos")
+      .in("constraint_type", ["PRIMARY KEY", "UNIQUE"]);
+
+    if (cErr) {
+      return {
+        ...base,
+        detail: `information_schema.table_constraints: ${cErr.message}`,
+      };
+    }
+
+    const { data: usage, error: uErr } = await info
+      .from("key_column_usage")
+      .select("constraint_name, column_name, ordinal_position")
+      .eq("table_schema", "public")
+      .eq("table_name", "collection_photos")
+      .order("ordinal_position", { ascending: true });
+
+    if (uErr) {
+      return {
+        ...base,
+        detail: `information_schema.key_column_usage: ${uErr.message}`,
+      };
+    }
+
+    const byConstraint = new Map<string, string[]>();
+    for (const row of usage ?? []) {
+      const name = String(row.constraint_name);
+      const cols = byConstraint.get(name) ?? [];
+      cols.push(String(row.column_name));
+      byConstraint.set(name, cols);
+    }
+
+    for (const c of constraints ?? []) {
+      const name = String(c.constraint_name);
+      const cols = byConstraint.get(name) ?? [];
+      const normalized = cols.map((x) => x.toLowerCase());
+      const coversComposite =
+        normalized.length === 2 &&
+        normalized.includes("collection_id") &&
+        normalized.includes("photo_id");
+      if (coversComposite) {
+        return {
+          identity_model: "collection_id:photo_id",
+          composite_unique_or_pk_found: true,
+          constraint_name: name,
+          constraint_type: String(c.constraint_type),
+          columns: cols,
+          detail: `Found ${c.constraint_type} ${name} on (${cols.join(", ")}).`,
+        };
+      }
+    }
+
+    return {
+      identity_model: "collection_id:photo_id",
+      composite_unique_or_pk_found: false,
+      constraint_name: null,
+      constraint_type: null,
+      columns: [],
+      detail:
+        "No PRIMARY KEY or UNIQUE constraint covering (collection_id, photo_id) was found via information_schema.",
+    };
+  } catch (err) {
+    return {
+      ...base,
+      detail: `Schema introspection threw: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }

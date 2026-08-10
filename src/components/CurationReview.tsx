@@ -26,6 +26,7 @@ import type {
   CollectionOption,
   SiteOption,
 } from "@/lib/curation-data";
+import type { MembershipIdentitySchemaInfo } from "@/lib/curation-dry-run";
 
 const FILTERS: { id: CurationFilter; label: string; countKey: keyof ReturnType<typeof summarizeCuration> }[] = [
   { id: "all", label: "All", countKey: "all" },
@@ -177,6 +178,7 @@ type Props = {
   loadError: string | null;
   /** Vercel preview for feature/curation-review only — no admin session required. */
   readOnlyPreview?: boolean;
+  membershipIdentitySchema?: MembershipIdentitySchemaInfo | null;
 };
 
 export function CurationReview({
@@ -185,6 +187,7 @@ export function CurationReview({
   collections,
   loadError,
   readOnlyPreview = false,
+  membershipIdentitySchema = null,
 }: Props) {
   const { ready, user } = useAdmin();
   const router = useRouter();
@@ -335,6 +338,7 @@ export function CurationReview({
         sites={sites}
         collections={collections}
         readOnlyPreview={readOnlyPreview}
+        membershipIdentitySchema={membershipIdentitySchema}
         onSwitchToAudit={() => {
           router.replace(pathname, { scroll: false });
         }}

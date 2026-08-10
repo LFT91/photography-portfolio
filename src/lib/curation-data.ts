@@ -213,11 +213,53 @@ export function toDryRunLiveSnapshot(
   };
 }
 
+const COLLECTION_PHOTOS_MIGRATION_DDL = {
+  found: true,
+  constraint_type: "PRIMARY KEY",
+  columns: ["collection_id", "photo_id"],
+  source: "supabase/migrations/20260808150000_sites_collections.sql",
+} as const;
+
 /**
  * Read-only introspection: does a PK/UNIQUE cover (collection_id, photo_id)?
- * Uses information_schema when accessible; never mutates.
+ * Tries information_schema, then PostgREST OpenAPI. Never mutates.
+ * When live schema queries are blocked for the anon client, attaches
+ * checked-in migration DDL as corroborating evidence (not a live query result).
  */
 export async function loadCollectionPhotosIdentitySchema(
+  supabase: SupabaseClient,
+): Promise<MembershipIdentitySchemaInfo> {
+  const fromInfoSchema = await tryInformationSchema(supabase);
+  if (fromInfoSchema.composite_unique_or_pk_found !== null) {
+    return fromInfoSchema;
+  }
+
+  const fromOpenApi = await tryOpenApiPrimaryKey();
+  if (fromOpenApi.composite_unique_or_pk_found !== null) {
+    return {
+      ...fromOpenApi,
+      detail: `${fromInfoSchema.detail} Falling back to OpenAPI: ${fromOpenApi.detail}`,
+    };
+  }
+
+  return {
+    identity_model: "collection_id:photo_id",
+    composite_unique_or_pk_found: null,
+    constraint_name: null,
+    constraint_type: null,
+    columns: [],
+    detail: [
+      fromInfoSchema.detail,
+      fromOpenApi.detail,
+      `Repo migration DDL declares PRIMARY KEY (${COLLECTION_PHOTOS_MIGRATION_DDL.columns.join(", ")}) in ${COLLECTION_PHOTOS_MIGRATION_DDL.source}.`,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    migration_ddl: { ...COLLECTION_PHOTOS_MIGRATION_DDL },
+  };
+}
+
+async function tryInformationSchema(
   supabase: SupabaseClient,
 ): Promise<MembershipIdentitySchemaInfo> {
   const base: MembershipIdentitySchemaInfo = {
@@ -226,7 +268,7 @@ export async function loadCollectionPhotosIdentitySchema(
     constraint_name: null,
     constraint_type: null,
     columns: [],
-    detail: "Schema introspection unavailable.",
+    detail: "information_schema unavailable.",
   };
 
   try {
@@ -299,7 +341,91 @@ export async function loadCollectionPhotosIdentitySchema(
   } catch (err) {
     return {
       ...base,
-      detail: `Schema introspection threw: ${err instanceof Error ? err.message : String(err)}`,
+      detail: `information_schema threw: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function tryOpenApiPrimaryKey(): Promise<MembershipIdentitySchemaInfo> {
+  const base: MembershipIdentitySchemaInfo = {
+    identity_model: "collection_id:photo_id",
+    composite_unique_or_pk_found: null,
+    constraint_name: null,
+    constraint_type: null,
+    columns: [],
+    detail: "OpenAPI introspection unavailable.",
+  };
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    return { ...base, detail: "Missing Supabase URL/anon key for OpenAPI." };
+  }
+
+  try {
+    const res = await fetch(`${url.replace(/\/$/, "")}/rest/v1/`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Accept: "application/openapi+json",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      let hint = `OpenAPI HTTP ${res.status}.`;
+      try {
+        const body = (await res.json()) as { message?: string; hint?: string };
+        if (body.message) hint = `OpenAPI HTTP ${res.status}: ${body.message}`;
+        if (body.hint) hint += ` (${body.hint})`;
+      } catch {
+        /* keep status-only hint */
+      }
+      return { ...base, detail: hint };
+    }
+    const spec = (await res.json()) as {
+      definitions?: Record<
+        string,
+        { required?: string[]; properties?: Record<string, unknown> }
+      >;
+    };
+    const def =
+      spec.definitions?.collection_photos ??
+      spec.definitions?.public_collection_photos;
+    if (!def) {
+      return {
+        ...base,
+        detail: "OpenAPI has no collection_photos definition.",
+      };
+    }
+    const required = (def.required ?? []).map((c) => c.toLowerCase());
+    const covers =
+      required.includes("collection_id") && required.includes("photo_id");
+    // PostgREST marks PK columns as required; composite PK usually lists both.
+    if (covers && required.length === 2) {
+      return {
+        identity_model: "collection_id:photo_id",
+        composite_unique_or_pk_found: true,
+        constraint_name: "collection_photos (OpenAPI required)",
+        constraint_type: "PRIMARY KEY (inferred)",
+        columns: ["collection_id", "photo_id"],
+        detail:
+          "OpenAPI marks collection_id and photo_id as the required key columns for collection_photos.",
+      };
+    }
+    return {
+      identity_model: "collection_id:photo_id",
+      composite_unique_or_pk_found: covers ? true : false,
+      constraint_name: covers ? "collection_photos (OpenAPI required)" : null,
+      constraint_type: covers ? "PRIMARY KEY (inferred)" : null,
+      columns: covers ? ["collection_id", "photo_id"] : required,
+      detail: covers
+        ? `OpenAPI required columns include collection_id and photo_id (${required.join(", ")}).`
+        : `OpenAPI required columns for collection_photos: [${required.join(", ")}].`,
+    };
+  } catch (err) {
+    return {
+      ...base,
+      detail: `OpenAPI threw: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }

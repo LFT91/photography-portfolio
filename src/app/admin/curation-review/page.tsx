@@ -11,10 +11,23 @@ import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
   title: "Curation review | Admin",
-  robots: { index: false, follow: false },
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nocache: true,
+  },
 };
 
 export const dynamic = "force-dynamic";
+
+/** Preview branch only — never true in production or local. */
+function isFeatureCurationReviewPreview(): boolean {
+  return (
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.VERCEL_GIT_COMMIT_REF === "feature/curation-review"
+  );
+}
 
 async function requireAdminSession() {
   if (!hasSupabaseEnv()) {
@@ -50,22 +63,42 @@ async function requireAdminSession() {
 }
 
 export default async function CurationReviewPage() {
-  const auth = await requireAdminSession();
+  const readOnlyPreview = isFeatureCurationReviewPreview();
 
-  if (!auth.ok) {
+  if (!hasSupabaseEnv()) {
     return (
       <main className="min-h-svh bg-ink px-5 py-16 sm:px-8">
         <h1 className="font-display text-4xl italic text-paper">
           Curation review
         </h1>
-        <p className="mt-4 font-brand text-paper-dim">{auth.reason}</p>
+        <p className="mt-4 font-brand text-paper-dim">
+          Supabase is not configured.
+        </p>
       </main>
     );
   }
 
+  let supabase;
+  if (readOnlyPreview) {
+    supabase = await createClient();
+  } else {
+    const auth = await requireAdminSession();
+    if (!auth.ok) {
+      return (
+        <main className="min-h-svh bg-ink px-5 py-16 sm:px-8">
+          <h1 className="font-display text-4xl italic text-paper">
+            Curation review
+          </h1>
+          <p className="mt-4 font-brand text-paper-dim">{auth.reason}</p>
+        </main>
+      );
+    }
+    supabase = auth.supabase;
+  }
+
   const [{ photos, error: photosError }, options] = await Promise.all([
-    loadCurationPhotos(auth.supabase),
-    loadCurationFilterOptions(auth.supabase),
+    loadCurationPhotos(supabase),
+    loadCurationFilterOptions(supabase),
   ]);
 
   const loadError = photosError || options.error;
@@ -84,6 +117,7 @@ export default async function CurationReviewPage() {
           sites={options.sites}
           collections={options.collections}
           loadError={loadError}
+          readOnlyPreview={readOnlyPreview}
         />
       </Suspense>
     </main>

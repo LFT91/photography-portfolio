@@ -23,12 +23,13 @@ import {
   destinationLabel,
   filterWorkingDecisions,
   fingerprintDecisions,
+  fingerprintDecisionsAsync,
   loadPersistedState,
   parseAndValidateManifest,
   parseProposalFilter,
   proposedPositionLabel,
   savePersistedState,
-  sha256HexAsync,
+  sha256HexFromBytes,
   storageKeyForManifest,
   summarizeProposals,
   validateProposalFields,
@@ -40,6 +41,7 @@ import {
   type WorkingProposal,
 } from "@/lib/curation-proposals";
 import { planCurationDryRun } from "@/lib/curation-dry-run";
+import type { MembershipIdentitySchemaInfo } from "@/lib/curation-dry-run";
 import { toDryRunLiveSnapshot } from "@/lib/curation-data";
 
 function siteLabel(siteId: string, sites: SiteOption[]) {
@@ -139,6 +141,7 @@ type Props = {
   sites: SiteOption[];
   collections: CollectionOption[];
   readOnlyPreview?: boolean;
+  membershipIdentitySchema?: MembershipIdentitySchemaInfo | null;
   onSwitchToAudit: () => void;
 };
 
@@ -146,7 +149,8 @@ type SessionState = {
   manifest: ImportedProposalManifest;
   storageKey: string;
   contentFingerprint: string;
-  manifestSha256: string;
+  inputFileSha256: string;
+  decisionFingerprintSha256: string;
   decisions: WorkingDecision[];
 };
 
@@ -189,6 +193,7 @@ export function CurationProposalReview({
   sites,
   collections,
   readOnlyPreview = false,
+  membershipIdentitySchema = null,
   onSwitchToAudit,
 }: Props) {
   const router = useRouter();
@@ -324,7 +329,10 @@ export function CurationProposalReview({
     setImporting(true);
     setImportErrors(null);
     try {
-      const text = await file.text();
+      // Hash exact uploaded bytes before any JSON parse / text normalization.
+      const bytes = await file.arrayBuffer();
+      const inputFileSha256 = await sha256HexFromBytes(bytes);
+      const text = new TextDecoder("utf-8").decode(bytes);
       let raw: unknown;
       try {
         raw = JSON.parse(text);
@@ -343,7 +351,9 @@ export function CurationProposalReview({
 
       const contentFingerprint =
         result.contentFingerprint || fingerprintDecisions(result.decisions);
-      const manifestSha256 = await sha256HexAsync(text);
+      const decisionFingerprintSha256 = await fingerprintDecisionsAsync(
+        result.decisions,
+      );
       const key = storageKeyForManifest(result.manifest, contentFingerprint);
       const persisted = loadPersistedState(key);
       const decisions =
@@ -359,7 +369,8 @@ export function CurationProposalReview({
         manifest: result.manifest,
         storageKey: key,
         contentFingerprint,
-        manifestSha256,
+        inputFileSha256,
+        decisionFingerprintSha256,
         decisions,
       };
       persist(next);
@@ -504,12 +515,17 @@ export function CurationProposalReview({
 
   const exportDryRun = () => {
     if (!session) return;
-    const live = toDryRunLiveSnapshot(photos, collections);
+    const live = toDryRunLiveSnapshot(
+      photos,
+      collections,
+      membershipIdentitySchema,
+    );
     const report = planCurationDryRun({
       manifest: session.manifest,
       workingDecisions: session.decisions,
       live,
-      manifestSha256: session.manifestSha256,
+      inputFileSha256: session.inputFileSha256,
+      decisionFingerprintSha256: session.decisionFingerprintSha256,
     });
     const blob = new Blob([JSON.stringify(report, null, 2)], {
       type: "application/json",

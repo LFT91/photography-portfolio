@@ -122,11 +122,24 @@ export function isValidDestination(siteId: string, slug: string): boolean {
 }
 
 export async function sha256HexAsync(text: string): Promise<string> {
+  return sha256HexFromBytes(new TextEncoder().encode(text));
+}
+
+export async function sha256HexFromBytes(
+  bytes: ArrayBuffer | Uint8Array,
+): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) {
     throw new Error("SHA-256 is unavailable in this environment.");
   }
-  const buf = await subtle.digest("SHA-256", new TextEncoder().encode(text));
+  const view =
+    bytes instanceof Uint8Array
+      ? bytes
+      : new Uint8Array(bytes);
+  // Copy into a plain ArrayBuffer — required by SubtleCrypto typings / some runtimes.
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  const buf = await subtle.digest("SHA-256", copy.buffer);
   return [...new Uint8Array(buf)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { CurationReview } from "@/components/CurationReview";
 import {
+  loadCollectionPhotosIdentitySchema,
   loadCurationFilterOptions,
   loadCurationPhotos,
 } from "@/lib/curation-data";
@@ -96,9 +97,14 @@ export default async function CurationReviewPage() {
     supabase = auth.supabase;
   }
 
-  const [{ photos, error: photosError }, options] = await Promise.all([
+  const [
+    { photos, error: photosError },
+    options,
+    membershipIdentitySchema,
+  ] = await Promise.all([
     loadCurationPhotos(supabase),
     loadCurationFilterOptions(supabase),
+    loadCollectionPhotosIdentitySchema(supabase),
   ]);
 
   const loadError = photosError || options.error;
@@ -118,6 +124,7 @@ export default async function CurationReviewPage() {
           collections={options.collections}
           loadError={loadError}
           readOnlyPreview={readOnlyPreview}
+          membershipIdentitySchema={membershipIdentitySchema}
         />
       </Suspense>
     </main>

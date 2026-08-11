@@ -1207,10 +1207,12 @@ export function Gallery({
     const to = filtered.findIndex((p) => photoKey(p) === toKey);
     if (from < 0 || to < 0 || from === to) return;
     const next = [...filtered];
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
-    // Keep every photo — never write a partial order.
-    if (next.length !== filtered.length) return;
+    const a = next[from];
+    const b = next[to];
+    if (!a || !b) return;
+    // Exact swap only — do not shift intervening photos.
+    next[from] = b;
+    next[to] = a;
     setViewOrder(room, next);
   };
 
@@ -1301,9 +1303,9 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag to reorder · ←↑↓→ swap on the grid · loupe or handles to
-              resize within a cell · double-click resets to 100% · ✕ stages
-              delete. Save or Cancel below.
+              Drag to swap · ←↑↓→ swap on the grid · loupe or handles to resize
+              within a cell · double-click resets to 100% · ✕ stages delete.
+              Save or Cancel below.
             </p>
           </>
         ) : null}

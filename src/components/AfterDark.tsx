@@ -68,6 +68,7 @@ export function AfterDark({
   }
 
   // Ayoub: Night Train introduction then gallery in one scrollable page (no second ENTER).
+  // Count is always the live After Dark membership length — never hard-code a future total.
   if (ayoub) {
     const count = items.length;
     const countLabel =

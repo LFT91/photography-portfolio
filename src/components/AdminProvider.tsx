@@ -2,7 +2,15 @@
 
 import type { Photo, PhotoCategory } from "@/data/photos";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
-import { FATNI_SITE_ID, photoOrderInCategory } from "@/lib/photo-map";
+import {
+  FATNI_SITE_ID,
+  getActiveSiteId,
+  photoOrderInCategory,
+} from "@/lib/photo-map";
+import {
+  planContiguousCollectionOrder,
+  verifyPersistedPhotoOrder,
+} from "@/lib/collection-order";
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import {
@@ -572,56 +580,78 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (error) throw new Error(error.message);
       }
 
-      // 5. Reorders — write independent order to Fatni collection_photos.sort_order
+      // 5. Reorders — write exact visual order as contiguous collection_photos.sort_order
+      //    on the active site (Fatni or Ayoub). Fail closed if reload verification fails.
+      const activeSiteId = getActiveSiteId();
       for (const [viewKey, ids] of Object.entries(current.orders)) {
         const resolved = ids
           .map((id) => (id.startsWith("pending:") ? idMap.get(id) : id))
           .filter((id): id is string => Boolean(id));
-        if (resolved.length < 2) continue;
+        if (resolved.length === 0) continue;
 
         const { data: collection, error: collectionError } = await supabase
           .from("collections")
           .select("id")
-          .eq("site_id", FATNI_SITE_ID)
+          .eq("site_id", activeSiteId)
           .eq("title", viewKey)
           .maybeSingle();
         if (collectionError) throw new Error(collectionError.message);
         if (!collection?.id) {
           throw new Error(
-            `No Fatni collection found for “${viewKey}”. Reorder was not saved.`,
+            `No ${activeSiteId} collection found for “${viewKey}”. Reorder was not saved.`,
           );
         }
 
-        const { data: rows, error: fetchError } = await supabase
+        const { count: membershipCount, error: countError } = await supabase
+          .from("collection_photos")
+          .select("photo_id", { count: "exact", head: true })
+          .eq("collection_id", collection.id);
+        if (countError) throw new Error(countError.message);
+        if ((membershipCount ?? 0) !== resolved.length) {
+          throw new Error(
+            `Reorder for “${viewKey}” is incomplete (${resolved.length} shown, ${membershipCount ?? 0} memberships). Save aborted.`,
+          );
+        }
+
+        const planned = planContiguousCollectionOrder(resolved);
+        const writeResults = await Promise.all(
+          planned.map((row) =>
+            supabase
+              .from("collection_photos")
+              .update({ sort_order: row.sort_order })
+              .eq("collection_id", collection.id)
+              .eq("photo_id", row.photo_id)
+              .select("photo_id"),
+          ),
+        );
+        for (let i = 0; i < writeResults.length; i++) {
+          const result = writeResults[i];
+          if (result.error) throw new Error(result.error.message);
+          if ((result.data?.length ?? 0) !== 1) {
+            throw new Error(
+              `Failed to update sort_order for photo ${planned[i].photo_id} in “${viewKey}”.`,
+            );
+          }
+        }
+
+        const { data: persistedRows, error: verifyError } = await supabase
           .from("collection_photos")
           .select("photo_id, sort_order")
           .eq("collection_id", collection.id)
-          .in("photo_id", resolved);
-        if (fetchError) throw new Error(fetchError.message);
+          .order("sort_order", { ascending: true });
+        if (verifyError) throw new Error(verifyError.message);
 
-        const orderById = new Map(
-          (rows ?? []).map((r) => [
-            r.photo_id as string,
-            r.sort_order as number,
-          ]),
+        const persistedIds = (persistedRows ?? []).map((r) =>
+          String(r.photo_id),
         );
-        const orders = resolved
-          .map((id) => orderById.get(id))
-          .filter((n): n is number => n != null)
-          .sort((a, b) => a - b);
-
-        // Same guard as legacy: skip room if any photo lacks membership.
-        if (orders.length !== resolved.length) continue;
-
-        await Promise.all(
-          resolved.map((id, i) =>
-            supabase
-              .from("collection_photos")
-              .update({ sort_order: orders[i] })
-              .eq("collection_id", collection.id)
-              .eq("photo_id", id),
-          ),
-        );
+        const check = verifyPersistedPhotoOrder({
+          submittedPhotoIds: resolved,
+          persistedPhotoIdsInOrder: persistedIds,
+          collectionLabel: viewKey,
+        });
+        if (!check.ok) {
+          throw new Error(check.detail);
+        }
       }
 
       revokeUploads(current.uploads);

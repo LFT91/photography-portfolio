@@ -352,29 +352,50 @@ export function CollectionManager() {
 
   const persistOrder = async (ordered: MemberPhoto[]) => {
     if (!supabase || !collectionId) return;
-    const ranks = ordered
-      .map((m) => m.sort_order)
-      .slice()
-      .sort((a, b) => a - b);
-    if (ranks.length !== ordered.length) return;
 
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
+      const planned = ordered.map((photo, i) => ({
+        photo_id: photo.id,
+        sort_order: i,
+      }));
       const results = await Promise.all(
-        ordered.map((photo, i) =>
+        planned.map((row) =>
           supabase
             .from("collection_photos")
-            .update({ sort_order: ranks[i] })
+            .update({ sort_order: row.sort_order })
             .eq("collection_id", collectionId)
-            .eq("photo_id", photo.id),
+            .eq("photo_id", row.photo_id)
+            .select("photo_id"),
         ),
       );
-      const failed = results.find((r) => r.error);
+      const failed = results.find(
+        (r) => r.error || (r.data?.length ?? 0) !== 1,
+      );
       if (failed?.error) throw new Error(failed.error.message);
+      if (failed) throw new Error("Order update did not affect every row.");
+
+      const { data: persisted, error: verifyError } = await supabase
+        .from("collection_photos")
+        .select("photo_id, sort_order")
+        .eq("collection_id", collectionId)
+        .order("sort_order", { ascending: true });
+      if (verifyError) throw new Error(verifyError.message);
+      const persistedIds = (persisted ?? []).map((r) => String(r.photo_id));
+      const submittedIds = ordered.map((p) => p.id);
+      if (
+        persistedIds.length !== submittedIds.length ||
+        persistedIds.some((id, i) => id !== submittedIds[i])
+      ) {
+        throw new Error(
+          "Order verification failed: saved sequence does not match the pre-save order.",
+        );
+      }
+
       setMembers(
-        ordered.map((photo, i) => ({ ...photo, sort_order: ranks[i] })),
+        ordered.map((photo, i) => ({ ...photo, sort_order: i })),
       );
       setStatus("Order saved.");
     } catch (err) {

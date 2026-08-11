@@ -9,7 +9,7 @@ import { isFatniSite } from "@/lib/site";
 export function AdminPanel() {
   const configured = hasSupabaseEnv();
   const router = useRouter();
-  const afterLogin = isFatniSite() ? "/admin/library" : "/work";
+  const afterLogin = isFatniSite() ? "/admin/library" : "/projects/after-dark";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

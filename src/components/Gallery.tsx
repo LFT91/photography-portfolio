@@ -21,6 +21,7 @@ import {
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
+import { photoOrderInCategory } from "@/lib/photo-map";
 
 function Lightbox({
   items,
@@ -1125,11 +1126,13 @@ export function Gallery({
   const {
     editing,
     draft,
+    orderBridge,
     saving,
     setPhotoTitle,
     setPhotoScale,
     markDeleted,
     setViewOrder,
+    clearOrderBridgeIfMatched,
   } = useAdmin();
   const ayoub = presentation === "ayoub";
   const { cols, baseCellWidth, galleryRef } = useGalleryLayout(
@@ -1147,8 +1150,19 @@ export function Gallery({
 
   const filtered = useMemo(() => {
     const list = source.filter((p) => photoInCategory(p, room));
-    return applyDraftToList(list, room, draft);
-  }, [draft, room, source]);
+    return applyDraftToList(list, room, draft, orderBridge);
+  }, [draft, orderBridge, room, source]);
+
+  useEffect(() => {
+    const serverIds = source
+      .filter((p) => photoInCategory(p, room) && p.id)
+      .sort(
+        (a, b) =>
+          photoOrderInCategory(a, room) - photoOrderInCategory(b, room),
+      )
+      .map((p) => p.id as string);
+    clearOrderBridgeIfMatched(room, serverIds);
+  }, [source, room, clearOrderBridgeIfMatched]);
 
   const selectFilter = (category: PhotoCategory) => {
     setFilter(category);

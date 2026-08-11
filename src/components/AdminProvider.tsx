@@ -9,6 +9,7 @@ import {
 } from "@/lib/photo-map";
 import {
   planContiguousCollectionOrder,
+  sequencesMatch,
   verifyPersistedPhotoOrder,
 } from "@/lib/collection-order";
 import type { User } from "@supabase/supabase-js";
@@ -77,6 +78,8 @@ export function applyDraftToList(
   source: Photo[],
   viewKey: PhotoCategory,
   draft: EditDraft,
+  /** Post-save bridge orders — keep UI stable while router.refresh() lands. */
+  orderBridge: Record<string, string[]> = {},
 ): Photo[] {
   const patched = source
     .filter((p) => {
@@ -113,7 +116,9 @@ export function applyDraftToList(
     );
 
   const combined = [...patched, ...pending];
-  const order = draft.orders[viewKey];
+  // Draft edits win; otherwise keep the last successfully saved visual order
+  // until the refreshed server props match (avoids a stale-order flash).
+  const order = draft.orders[viewKey] ?? orderBridge[viewKey];
   if (!order?.length) {
     return combined.sort(
       (a, b) => photoOrderInCategory(a, viewKey) - photoOrderInCategory(b, viewKey),
@@ -150,12 +155,19 @@ type AdminContextValue = {
   editing: boolean;
   setEditing: (value: boolean) => void;
   draft: EditDraft;
+  /** Post-save visual order retained until server props catch up (not dirty). */
+  orderBridge: Record<string, string[]>;
   dirty: boolean;
   saving: boolean;
   saveError: string | null;
   signOut: () => Promise<void>;
   discardDraft: () => void;
   saveDraft: () => Promise<string | null>;
+  /** Drop post-save order bridge once server props match the saved sequence. */
+  clearOrderBridgeIfMatched: (
+    viewKey: PhotoCategory,
+    serverOrderedIds: string[],
+  ) => void;
   setPhotoTitle: (photo: Photo, title: string) => void;
   setPhotoScale: (photo: Photo, scale: number) => void;
   markDeleted: (photo: Photo) => void;
@@ -182,6 +194,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [editing, setEditingState] = useState(false);
   const [draft, setDraft] = useState<EditDraft>(emptyDraft);
+  /** Survives draft clear so the gallery does not flash stale server order. */
+  const [orderBridge, setOrderBridge] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -240,8 +254,23 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       revokeReplaces(prev.replaces);
       return emptyDraft();
     });
+    setOrderBridge({});
     setSaveError(null);
   }, []);
+
+  const clearOrderBridgeIfMatched = useCallback(
+    (viewKey: PhotoCategory, serverOrderedIds: string[]) => {
+      setOrderBridge((prev) => {
+        const expected = prev[viewKey];
+        if (!expected?.length) return prev;
+        if (!sequencesMatch(expected, serverOrderedIds)) return prev;
+        const next = { ...prev };
+        delete next[viewKey];
+        return next;
+      });
+    },
+    [],
+  );
 
   const setEditing = useCallback(
     (value: boolean) => {
@@ -656,6 +685,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
       revokeUploads(current.uploads);
       revokeReplaces(current.replaces);
+      // Bridge keeps the saved visual order until router.refresh() delivers
+      // matching server props — clearing draft alone would flash the old order.
+      setOrderBridge(current.orders);
       setDraft(emptyDraft());
       refresh();
       return null;
@@ -676,12 +708,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       editing: Boolean(user) && editing,
       setEditing,
       draft,
+      orderBridge,
       dirty,
       saving,
       saveError,
       signOut,
       discardDraft,
       saveDraft,
+      clearOrderBridgeIfMatched,
       setPhotoTitle,
       setPhotoScale,
       markDeleted,
@@ -697,12 +731,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       editing,
       setEditing,
       draft,
+      orderBridge,
       dirty,
       saving,
       saveError,
       signOut,
       discardDraft,
       saveDraft,
+      clearOrderBridgeIfMatched,
       setPhotoTitle,
       setPhotoScale,
       markDeleted,

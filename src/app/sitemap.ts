@@ -8,7 +8,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   if (isAyoubSite()) {
     return [
       "",
-      "/work",
       "/monochrome",
       "/projects",
       "/projects/after-dark",
@@ -20,7 +19,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }));
   }
 
-  // After Dark remains reachable at /after-dark but is not publicly indexed.
   const collectionPaths = fatniArchiveCollections().map((c) => c.href);
   return ["", "/work", ...collectionPaths, "/about", "/contact"].map(
     (path) => ({

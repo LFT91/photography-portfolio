@@ -1370,7 +1370,7 @@ export function Gallery({
         sectionId ? "scroll-mt-16 sm:scroll-mt-20" : ""
       } ${
         compactTop
-          ? "pt-4 sm:pt-5"
+          ? "pt-1 sm:pt-2"
           : tightTop
             ? "pt-6 sm:pt-8"
             : "pt-10 sm:pt-14"

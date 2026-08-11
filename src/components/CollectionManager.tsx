@@ -1,11 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useAdmin } from "@/components/AdminProvider";
 import { ProtectedImage } from "@/components/ProtectedImage";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
+import {
+  filterUnassignedPhotos,
+  planUnassignedAllocation,
+  type MembershipRef,
+} from "@/lib/unassigned-pool";
 
 type SiteRow = { id: string; name: string };
 type CollectionRow = {
@@ -14,6 +26,7 @@ type CollectionRow = {
   slug: string;
   sort_order: number;
 };
+type CollectionWithSite = CollectionRow & { site_id: string };
 type LibraryPhoto = {
   id: string;
   title: string;
@@ -50,9 +63,16 @@ export function CollectionManager() {
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [siteId, setSiteId] = useState<string>("");
   const [collections, setCollections] = useState<CollectionRow[]>([]);
+  const [allCollections, setAllCollections] = useState<CollectionWithSite[]>(
+    [],
+  );
   const [collectionId, setCollectionId] = useState<string>("");
   const [members, setMembers] = useState<MemberPhoto[]>([]);
   const [library, setLibrary] = useState<LibraryPhoto[]>([]);
+  /** photo_ids with any collection_photos row (all sites). */
+  const [assignedPhotoIds, setAssignedPhotoIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [libraryQuery, setLibraryQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +83,16 @@ export function CollectionManager() {
   /** Member row currently choosing a move destination. */
   const [movingPhotoId, setMovingPhotoId] = useState<string | null>(null);
   const [moveTargetId, setMoveTargetId] = useState("");
+  /** Index into the filtered unassigned list, or null when closed. */
+  const [holdPreviewIndex, setHoldPreviewIndex] = useState<number | null>(
+    null,
+  );
+  const [allocSiteId, setAllocSiteId] = useState("");
+  const [allocCollectionId, setAllocCollectionId] = useState("");
   const queueRef = useRef(queue);
-  queueRef.current = queue;
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
 
   useEffect(() => {
     if (!ready) return;
@@ -86,6 +114,28 @@ export function CollectionManager() {
       .order("title", { ascending: true });
     if (err) throw new Error(err.message);
     setLibrary(data ?? []);
+  }, [supabase]);
+
+  const loadAssignedPhotoIds = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error: err } = await supabase
+      .from("collection_photos")
+      .select("photo_id");
+    if (err) throw new Error(err.message);
+    setAssignedPhotoIds(new Set((data ?? []).map((r) => String(r.photo_id))));
+  }, [supabase]);
+
+  const loadAllMemberships = useCallback(async (): Promise<MembershipRef[]> => {
+    if (!supabase) return [];
+    const { data, error: err } = await supabase
+      .from("collection_photos")
+      .select("photo_id, collection_id, sort_order");
+    if (err) throw new Error(err.message);
+    return (data ?? []).map((r) => ({
+      photo_id: String(r.photo_id),
+      collection_id: String(r.collection_id),
+      sort_order: Number(r.sort_order),
+    }));
   }, [supabase]);
 
   const loadMembers = useCallback(
@@ -122,7 +172,7 @@ export function CollectionManager() {
     [supabase],
   );
 
-  // Initial load: sites + master library
+  // Initial load: sites + master library + global assignments + all collections
   useEffect(() => {
     if (!ready || !user || !supabase) return;
     let cancelled = false;
@@ -130,22 +180,35 @@ export function CollectionManager() {
       setBooting(true);
       setError(null);
       try {
-        const [sitesRes, libraryRes] = await Promise.all([
-          supabase.from("sites").select("id, name").order("name", {
-            ascending: true,
-          }),
-          supabase
-            .from("photos")
-            .select("id, title, public_url")
-            .order("title", { ascending: true }),
-        ]);
+        const [sitesRes, libraryRes, assignedRes, allCollRes] =
+          await Promise.all([
+            supabase.from("sites").select("id, name").order("name", {
+              ascending: true,
+            }),
+            supabase
+              .from("photos")
+              .select("id, title, public_url")
+              .order("title", { ascending: true }),
+            supabase.from("collection_photos").select("photo_id"),
+            supabase
+              .from("collections")
+              .select("id, title, slug, sort_order, site_id")
+              .order("sort_order", { ascending: true }),
+          ]);
         if (sitesRes.error) throw new Error(sitesRes.error.message);
         if (libraryRes.error) throw new Error(libraryRes.error.message);
+        if (assignedRes.error) throw new Error(assignedRes.error.message);
+        if (allCollRes.error) throw new Error(allCollRes.error.message);
         if (cancelled) return;
         const siteRows = sitesRes.data ?? [];
         setSites(siteRows);
         setLibrary(libraryRes.data ?? []);
+        setAssignedPhotoIds(
+          new Set((assignedRes.data ?? []).map((r) => String(r.photo_id))),
+        );
+        setAllCollections((allCollRes.data ?? []) as CollectionWithSite[]);
         setSiteId((prev) => prev || siteRows[0]?.id || "");
+        setAllocSiteId((prev) => prev || siteRows[0]?.id || "");
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load.");
@@ -162,6 +225,7 @@ export function CollectionManager() {
   // When site changes: load its collections
   useEffect(() => {
     if (!supabase || !siteId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear dependent selection when site is empty
       setCollections([]);
       setCollectionId("");
       return;
@@ -198,6 +262,7 @@ export function CollectionManager() {
   // When collection changes: load membership
   useEffect(() => {
     if (!collectionId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear members when no collection selected
       setMembers([]);
       return;
     }
@@ -220,19 +285,64 @@ export function CollectionManager() {
     };
   }, [collectionId, loadMembers]);
 
-  const memberIds = useMemo(
-    () => new Set(members.map((m) => m.id)),
-    [members],
+  const unassigned = useMemo(
+    () => filterUnassignedPhotos(library, assignedPhotoIds),
+    [library, assignedPhotoIds],
   );
 
   const addable = useMemo(() => {
     const q = libraryQuery.trim().toLowerCase();
-    return library.filter((p) => {
-      if (memberIds.has(p.id)) return false;
+    return unassigned.filter((p) => {
       if (!q) return true;
       return p.title.toLowerCase().includes(q);
     });
-  }, [library, memberIds, libraryQuery]);
+  }, [unassigned, libraryQuery]);
+
+  const effectiveAllocSiteId = allocSiteId || sites[0]?.id || "";
+  const allocCollections = useMemo(
+    () => allCollections.filter((c) => c.site_id === effectiveAllocSiteId),
+    [allCollections, effectiveAllocSiteId],
+  );
+  const effectiveAllocCollectionId = allocCollections.some(
+    (c) => c.id === allocCollectionId,
+  )
+    ? allocCollectionId
+    : (allocCollections[0]?.id ?? "");
+
+  const safeHoldPreviewIndex =
+    holdPreviewIndex == null
+      ? null
+      : addable.length === 0
+        ? null
+        : Math.min(holdPreviewIndex, addable.length - 1);
+
+  const holdPreviewPhoto =
+    safeHoldPreviewIndex != null ? (addable[safeHoldPreviewIndex] ?? null) : null;
+
+  const onHoldKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (safeHoldPreviewIndex == null) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setHoldPreviewIndex(null);
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setHoldPreviewIndex(
+        (safeHoldPreviewIndex - 1 + addable.length) % addable.length,
+      );
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setHoldPreviewIndex((safeHoldPreviewIndex + 1) % addable.length);
+    }
+  });
+
+  useEffect(() => {
+    if (holdPreviewIndex == null) return;
+    window.addEventListener("keydown", onHoldKeyDown);
+    return () => window.removeEventListener("keydown", onHoldKeyDown);
+  }, [holdPreviewIndex]);
 
   /** Other collections on the currently selected site (excludes the open collection). */
   const moveDestinations = useMemo(
@@ -285,36 +395,73 @@ export function CollectionManager() {
     await persistOrder(next);
   };
 
-  const addPhoto = async (photo: LibraryPhoto) => {
-    if (!supabase || !collectionId) return;
+  const addPhoto = async (
+    photo: LibraryPhoto,
+    destinationCollectionId: string = collectionId,
+  ) => {
+    if (!supabase || !destinationCollectionId) return;
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
-      const { data: maxRows, error: maxError } = await supabase
-        .from("collection_photos")
-        .select("sort_order")
-        .eq("collection_id", collectionId)
-        .order("sort_order", { ascending: false })
-        .limit(1);
-      if (maxError) throw new Error(maxError.message);
-      const nextPos = (maxRows?.[0]?.sort_order ?? -1) + 1;
+      const memberships = await loadAllMemberships();
+      const plan = planUnassignedAllocation({
+        photoId: photo.id,
+        destinationCollectionId,
+        memberships,
+      });
+      if (!plan.ok) {
+        throw new Error(
+          plan.reason === "already_assigned"
+            ? `“${photo.title}” is already assigned elsewhere and cannot be added from Unassigned / Hold.`
+            : plan.detail,
+        );
+      }
 
       const { error: insertError } = await supabase
         .from("collection_photos")
         .insert({
-          collection_id: collectionId,
+          collection_id: destinationCollectionId,
           photo_id: photo.id,
-          sort_order: nextPos,
+          sort_order: plan.sort_order,
         });
       if (insertError) throw new Error(insertError.message);
 
-      setStatus(`Added “${photo.title}”.`);
-      await loadMembers(collectionId);
+      setAssignedPhotoIds((prev) => {
+        const next = new Set(prev);
+        next.add(photo.id);
+        return next;
+      });
+
+      const dest = allCollections.find((c) => c.id === destinationCollectionId);
+      setStatus(
+        dest
+          ? `Assigned “${photo.title}” to ${dest.title}.`
+          : `Assigned “${photo.title}”.`,
+      );
+
+      if (destinationCollectionId === collectionId) {
+        await loadMembers(collectionId);
+      }
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Add failed.");
+      try {
+        await loadAssignedPhotoIds();
+      } catch {
+        /* keep primary error */
+      }
+      return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  const allocateFromHoldPreview = async () => {
+    if (holdPreviewPhoto == null || !effectiveAllocCollectionId) return;
+    const ok = await addPhoto(holdPreviewPhoto, effectiveAllocCollectionId);
+    if (ok && addable.length <= 1) {
+      setHoldPreviewIndex(null);
     }
   };
 
@@ -338,7 +485,7 @@ export function CollectionManager() {
         .eq("photo_id", photo.id);
       if (deleteError) throw new Error(deleteError.message);
       setStatus(`Removed “${photo.title}” from collection.`);
-      await loadMembers(collectionId);
+      await Promise.all([loadMembers(collectionId), loadAssignedPhotoIds()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Remove failed.");
     } finally {
@@ -421,11 +568,11 @@ export function CollectionManager() {
           ? `Moved “${photo.title}” to “${destination.title}” (already a member; removed from this collection).`
           : `Moved “${photo.title}” to “${destination.title}”.`,
       );
-      await loadMembers(collectionId);
+      await Promise.all([loadMembers(collectionId), loadAssignedPhotoIds()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Move failed.");
       try {
-        await loadMembers(collectionId);
+        await Promise.all([loadMembers(collectionId), loadAssignedPhotoIds()]);
       } catch {
         /* keep primary error */
       }
@@ -811,7 +958,7 @@ export function CollectionManager() {
             <p className="font-brand text-paper-dim">Select a collection.</p>
           ) : members.length === 0 ? (
             <p className="font-brand text-paper-dim">
-              This collection is empty. Add photos from the library.
+              This collection is empty. Assign photos from Unassigned / Hold.
             </p>
           ) : (
             <ul className="space-y-3">
@@ -931,11 +1078,16 @@ export function CollectionManager() {
 
         <section>
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <h2 className="font-brand text-lg tracking-[0.04em] text-paper">
-              Add from library
-            </h2>
+            <div>
+              <h2 className="font-brand text-lg tracking-[0.04em] text-paper">
+                Unassigned / Hold
+              </h2>
+              <p className="mt-1 font-brand text-xs tracking-[0.08em] text-fog">
+                Globally unassigned photos only
+              </p>
+            </div>
             <p className="font-brand text-sm text-fog tabular-nums">
-              {addable.length} available
+              {unassigned.length} photo{unassigned.length === 1 ? "" : "s"}
             </p>
           </div>
           <input
@@ -945,20 +1097,30 @@ export function CollectionManager() {
             placeholder="Search by title"
             className="mb-4 w-full border border-line bg-transparent px-4 py-3 font-brand text-paper outline-none placeholder:text-fog focus:border-ember"
           />
-          {!collectionId ? (
-            <p className="font-brand text-paper-dim">Select a collection first.</p>
-          ) : addable.length === 0 ? (
+          {addable.length === 0 ? (
             <p className="font-brand text-paper-dim">
-              No matching library photos to add.
+              {libraryQuery.trim()
+                ? "No matching unassigned photos."
+                : "No unassigned photos."}
             </p>
           ) : (
             <ul className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-              {addable.map((photo) => (
+              {addable.map((photo, index) => (
                 <li
                   key={photo.id}
                   className="flex items-center gap-3 border border-line/80 p-2"
                 >
-                  <div className="relative h-12 w-12 shrink-0 overflow-hidden bg-ink">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setAllocSiteId(siteId || sites[0]?.id || "");
+                      setHoldPreviewIndex(index);
+                      setError(null);
+                    }}
+                    className="relative h-12 w-12 shrink-0 overflow-hidden bg-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-ember"
+                    aria-label={`Preview ${photo.title}`}
+                  >
                     <ProtectedImage
                       src={photo.public_url}
                       alt={photo.title}
@@ -966,15 +1128,29 @@ export function CollectionManager() {
                       sizes="48px"
                       className="object-cover"
                     />
-                  </div>
-                  <p className="min-w-0 flex-1 truncate font-brand text-sm text-paper">
-                    {photo.title}
-                  </p>
+                  </button>
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void addPhoto(photo)}
+                    onClick={() => {
+                      setAllocSiteId(siteId || sites[0]?.id || "");
+                      setHoldPreviewIndex(index);
+                      setError(null);
+                    }}
+                    className="min-w-0 flex-1 truncate text-left font-brand text-sm text-paper transition-colors hover:text-ember"
+                  >
+                    {photo.title}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !collectionId}
+                    onClick={() => void addPhoto(photo, collectionId)}
                     className="shrink-0 border border-ember px-3 py-1.5 font-brand text-sm text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
+                    title={
+                      collectionId
+                        ? "Add to the open collection"
+                        : "Select a collection first"
+                    }
                   >
                     Add
                   </button>
@@ -984,6 +1160,128 @@ export function CollectionManager() {
           )}
         </section>
       </div>
+
+      {holdPreviewPhoto && safeHoldPreviewIndex != null ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/92 p-4 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Unassigned photo preview"
+          onClick={() => setHoldPreviewIndex(null)}
+        >
+          <div
+            className="relative flex max-h-full w-full max-w-5xl flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-display text-2xl italic text-paper sm:text-3xl">
+                  {holdPreviewPhoto.title}
+                </p>
+                <p className="mt-1 font-brand text-sm tracking-[0.08em] text-fog tabular-nums">
+                  {safeHoldPreviewIndex + 1} of {addable.length}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHoldPreviewIndex(null)}
+                className="border border-line px-3 py-1.5 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="relative flex min-h-0 flex-1 items-center justify-center">
+              <button
+                type="button"
+                disabled={addable.length < 2 || busy}
+                onClick={() =>
+                  setHoldPreviewIndex(
+                    (safeHoldPreviewIndex - 1 + addable.length) %
+                      addable.length,
+                  )
+                }
+                className="absolute left-0 z-10 border border-line bg-ink/70 px-3 py-2 font-brand text-xl text-paper-dim transition-colors hover:text-paper disabled:opacity-30 sm:left-2"
+                aria-label="Previous unassigned photo"
+              >
+                ‹
+              </button>
+              <div className="relative mx-10 max-h-[min(70vh,720px)] w-full max-w-3xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={holdPreviewPhoto.public_url}
+                  alt={holdPreviewPhoto.title}
+                  className="mx-auto max-h-[min(70vh,720px)] w-auto max-w-full object-contain"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={addable.length < 2 || busy}
+                onClick={() =>
+                  setHoldPreviewIndex(
+                    (safeHoldPreviewIndex + 1) % addable.length,
+                  )
+                }
+                className="absolute right-0 z-10 border border-line bg-ink/70 px-3 py-2 font-brand text-xl text-paper-dim transition-colors hover:text-paper disabled:opacity-30 sm:right-2"
+                aria-label="Next unassigned photo"
+              >
+                ›
+              </button>
+            </div>
+
+            <div className="grid gap-3 border border-line bg-ink/80 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <label className="block">
+                <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
+                  Site
+                </span>
+                <select
+                  value={effectiveAllocSiteId}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setAllocSiteId(e.target.value);
+                    const nextCols = allCollections.filter(
+                      (c) => c.site_id === e.target.value,
+                    );
+                    setAllocCollectionId(nextCols[0]?.id ?? "");
+                  }}
+                  className="mt-2 w-full border border-line bg-ink px-3 py-2 font-brand text-paper outline-none focus:border-ember"
+                >
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="font-brand text-xs tracking-[0.12em] text-fog uppercase">
+                  Collection
+                </span>
+                <select
+                  value={effectiveAllocCollectionId}
+                  disabled={busy || !allocCollections.length}
+                  onChange={(e) => setAllocCollectionId(e.target.value)}
+                  className="mt-2 w-full border border-line bg-ink px-3 py-2 font-brand text-paper outline-none focus:border-ember"
+                >
+                  {allocCollections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !effectiveAllocCollectionId}
+                onClick={() => void allocateFromHoldPreview()}
+                className="border border-ember px-5 py-2.5 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

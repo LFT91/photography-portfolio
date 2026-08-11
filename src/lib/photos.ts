@@ -240,8 +240,7 @@ function fatniSummariesFromStatic(): FatniCollectionSummary[] {
 
 /**
  * Fatni public archive index tiles — DB order + first membership as cover.
- * After Dark is intentionally omitted from the public index/preview
- * (data and /after-dark remain intact). Empty on non-Fatni deployments.
+ * Empty on non-Fatni deployments. Retired rooms (e.g. After Dark) are skipped.
  */
 export async function getFatniCollectionSummaries(): Promise<
   FatniCollectionSummary[]

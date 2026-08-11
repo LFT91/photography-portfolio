@@ -38,7 +38,7 @@ export const SITES: Record<SiteId, SiteConfig> = {
     id: "ayoub-el-fatni",
     name: "Ayoub El Fatni",
     description:
-      "Photographs by Ayoub El Fatni — selected work, monochrome, and projects.",
+      "Photographs by Ayoub El Fatni — after dark, monochrome, and projects.",
     ogDescription: "Photographs by Ayoub El Fatni.",
     nav: [
       { href: "/projects/after-dark", label: "After Dark" },

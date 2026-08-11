@@ -12,6 +12,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useAdmin } from "@/components/AdminProvider";
 import { ProtectedImage } from "@/components/ProtectedImage";
+import { isRetiredCollection } from "@/lib/curation";
+import { FATNI_SITE_ID, isAyoubSite } from "@/lib/site";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
 import {
   filterUnassignedPhotos,
@@ -31,6 +33,7 @@ type LibraryPhoto = {
   id: string;
   title: string;
   public_url: string;
+  storage_path?: string | null;
 };
 type MemberPhoto = LibraryPhoto & { sort_order: number };
 
@@ -110,10 +113,10 @@ export function CollectionManager() {
     if (!supabase) return;
     const { data, error: err } = await supabase
       .from("photos")
-      .select("id, title, public_url")
+      .select("id, title, public_url, storage_path")
       .order("title", { ascending: true });
     if (err) throw new Error(err.message);
-    setLibrary(data ?? []);
+    setLibrary((data ?? []) as LibraryPhoto[]);
   }, [supabase]);
 
   const loadAssignedPhotoIds = useCallback(async () => {
@@ -182,12 +185,12 @@ export function CollectionManager() {
       try {
         const [sitesRes, libraryRes, assignedRes, allCollRes] =
           await Promise.all([
-            supabase.from("sites").select("id, name").order("name", {
+            supabase.from("sites").select("id, name").order("id", {
               ascending: true,
             }),
             supabase
               .from("photos")
-              .select("id, title, public_url")
+              .select("id, title, public_url, storage_path")
               .order("title", { ascending: true }),
             supabase.from("collection_photos").select("photo_id"),
             supabase
@@ -200,13 +203,22 @@ export function CollectionManager() {
         if (assignedRes.error) throw new Error(assignedRes.error.message);
         if (allCollRes.error) throw new Error(allCollRes.error.message);
         if (cancelled) return;
-        const siteRows = sitesRes.data ?? [];
+        // Prefer Fatni first so the default matches the photography archive.
+        const siteRows = [...(sitesRes.data ?? [])].sort((a, b) => {
+          if (a.id === FATNI_SITE_ID) return -1;
+          if (b.id === FATNI_SITE_ID) return 1;
+          return a.name.localeCompare(b.name);
+        });
         setSites(siteRows);
-        setLibrary(libraryRes.data ?? []);
+        setLibrary((libraryRes.data ?? []) as LibraryPhoto[]);
         setAssignedPhotoIds(
           new Set((assignedRes.data ?? []).map((r) => String(r.photo_id))),
         );
-        setAllCollections((allCollRes.data ?? []) as CollectionWithSite[]);
+        setAllCollections(
+          ((allCollRes.data ?? []) as CollectionWithSite[]).filter(
+            (c) => !isRetiredCollection(c.site_id, c.slug),
+          ),
+        );
         setSiteId((prev) => prev || siteRows[0]?.id || "");
         setAllocSiteId((prev) => prev || siteRows[0]?.id || "");
       } catch (err) {
@@ -222,15 +234,20 @@ export function CollectionManager() {
     };
   }, [ready, user, supabase]);
 
-  // When site changes: load its collections
+  // When site changes: load its collections (exclude retired rooms)
   useEffect(() => {
     if (!supabase || !siteId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clear dependent selection when site is empty
       setCollections([]);
       setCollectionId("");
+      setMembers([]);
       return;
     }
     let cancelled = false;
+    // Clear immediately so the prior site's collections never linger.
+    setCollections([]);
+    setCollectionId("");
+    setMembers([]);
     (async () => {
       setError(null);
       try {
@@ -241,13 +258,15 @@ export function CollectionManager() {
           .order("sort_order", { ascending: true });
         if (err) throw new Error(err.message);
         if (cancelled) return;
-        const rows = data ?? [];
-        setCollections(rows);
-        setCollectionId((prev) =>
-          rows.some((c) => c.id === prev) ? prev : (rows[0]?.id ?? ""),
+        const rows = (data ?? []).filter(
+          (c) => !isRetiredCollection(siteId, c.slug),
         );
+        setCollections(rows);
+        setCollectionId(rows[0]?.id ?? "");
       } catch (err) {
         if (!cancelled) {
+          setCollections([]);
+          setCollectionId("");
           setError(
             err instanceof Error ? err.message : "Failed to load collections.",
           );
@@ -509,6 +528,69 @@ export function CollectionManager() {
       await Promise.all([loadMembers(collectionId), loadAssignedPhotoIds()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Remove failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Permanently delete a master photo (and storage object) from the database. */
+  const deletePhotoFromDatabase = async (photo: LibraryPhoto) => {
+    if (!supabase) return;
+    if (
+      !window.confirm(
+        `Permanently delete “${photo.title}” from the database and storage?\n\nThis removes it from every collection and cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const { data: row, error: fetchError } = await supabase
+        .from("photos")
+        .select("storage_path")
+        .eq("id", photo.id)
+        .maybeSingle();
+      if (fetchError) throw new Error(fetchError.message);
+
+      const { error: deleteError } = await supabase
+        .from("photos")
+        .delete()
+        .eq("id", photo.id);
+      if (deleteError) throw new Error(deleteError.message);
+
+      const path = row?.storage_path ?? photo.storage_path;
+      if (path && !String(path).startsWith("images/")) {
+        const { error: storageError } = await supabase.storage
+          .from("photos")
+          .remove([String(path)]);
+        if (storageError) {
+          // Row is already gone; surface storage cleanup failure without rolling back.
+          setError(
+            `Deleted from database, but storage cleanup failed: ${storageError.message}`,
+          );
+        }
+      }
+
+      setLibrary((prev) => prev.filter((p) => p.id !== photo.id));
+      setAssignedPhotoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photo.id);
+        return next;
+      });
+      setMembers((prev) => prev.filter((p) => p.id !== photo.id));
+      if (holdPreviewPhoto?.id === photo.id) {
+        setHoldPreviewIndex(null);
+      }
+      setStatus(`Deleted “${photo.title}” from the database.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed.");
+      try {
+        await Promise.all([loadLibrary(), loadAssignedPhotoIds()]);
+      } catch {
+        /* keep primary error */
+      }
     } finally {
       setBusy(false);
     }
@@ -816,7 +898,7 @@ export function CollectionManager() {
           </p>
         </div>
         <Link
-          href="/work"
+          href={isAyoubSite() ? "/projects/after-dark" : "/work"}
           className="border border-line px-4 py-2 font-brand text-sm text-paper-dim transition-colors hover:text-paper"
         >
           ← Back to site
@@ -832,9 +914,13 @@ export function CollectionManager() {
             value={siteId}
             disabled={busy}
             onChange={(e) => {
+              const next = e.target.value;
               setMovingPhotoId(null);
               setMoveTargetId("");
-              setSiteId(e.target.value);
+              setCollections([]);
+              setCollectionId("");
+              setMembers([]);
+              setSiteId(next);
             }}
             className="mt-2 w-full border border-line bg-ink px-4 py-3 font-brand text-paper outline-none focus:border-ember"
           >
@@ -1104,7 +1190,8 @@ export function CollectionManager() {
                 Unassigned / Hold
               </h2>
               <p className="mt-1 font-brand text-xs tracking-[0.08em] text-fog">
-                Globally unassigned photos only
+                Globally unassigned photos only · Delete removes from the
+                database
               </p>
             </div>
             <p className="font-brand text-sm text-fog tabular-nums">
@@ -1174,6 +1261,15 @@ export function CollectionManager() {
                     }
                   >
                     Add
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void deletePhotoFromDatabase(photo)}
+                    className="shrink-0 border border-line px-3 py-1.5 font-brand text-sm text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
+                    title="Permanently delete from the database"
+                  >
+                    Delete
                   </button>
                 </li>
               ))}
@@ -1256,7 +1352,7 @@ export function CollectionManager() {
             </div>
 
             <div
-              className="grid gap-3 border border-line bg-ink/80 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+              className="grid gap-3 border border-line bg-ink/80 p-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
               onClick={(e) => e.stopPropagation()}
             >
               <label className="block">
@@ -1306,6 +1402,14 @@ export function CollectionManager() {
                 className="border border-ember px-5 py-2.5 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
               >
                 Assign
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deletePhotoFromDatabase(holdPreviewPhoto)}
+                className="border border-line px-5 py-2.5 font-brand text-sm tracking-[0.06em] text-ember transition-colors hover:bg-ember/10 disabled:opacity-40"
+              >
+                Delete from database
               </button>
             </div>
           </div>

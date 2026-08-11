@@ -3,8 +3,7 @@ import type { PhotoCategory } from "@/data/photos";
 /**
  * Fatni public archive collections.
  * Photographs come from Supabase membership/order; this config drives
- * public hrefs. After Dark stays in data + /after-dark, but is excluded
- * from the public archive index/preview.
+ * public hrefs. After Dark is Ayoub-only (not a Fatni collection).
  *
  * Adding a future collection: seed a collections row (site_id + slug + title),
  * extend PhotoCategory if needed, and append a def here (or rely on DB
@@ -22,19 +21,13 @@ export type FatniCollectionDef = {
   special?: boolean;
 };
 
-/** Public Fatni archive rooms (After Dark is special — not indexed). */
+/** Public Fatni archive rooms. */
 export const FATNI_PUBLIC_COLLECTIONS: readonly FatniCollectionDef[] = [
   { slug: "nature", title: "Nature", href: "/work/nature" },
   { slug: "urban", title: "Urban", href: "/work/urban" },
   { slug: "astro", title: "Astro", href: "/work/astro" },
   { slug: "street", title: "Street", href: "/work/street" },
   { slug: "monochrome", title: "Monochrome", href: "/work/monochrome" },
-  {
-    slug: "after-dark",
-    title: "After Dark",
-    href: "/after-dark",
-    special: true,
-  },
 ] as const;
 
 export type FatniCollectionSummary = {
@@ -66,7 +59,7 @@ export function fatniDefByTitle(
   return FATNI_PUBLIC_COLLECTIONS.find((c) => c.title === title);
 }
 
-/** Regular archive rooms (excludes After Dark project). */
+/** Regular archive rooms (excludes any special / non-index rooms). */
 export function fatniArchiveCollections(): FatniCollectionDef[] {
   return FATNI_PUBLIC_COLLECTIONS.filter((c) => !c.special);
 }

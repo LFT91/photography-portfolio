@@ -17,16 +17,12 @@ export default async function AyoubAfterDarkPage() {
   if (!isAyoubSite()) notFound();
 
   const items = await getCollectionPhotos("After Dark");
-  const cover =
-    items.find((photo) => photo.title.trim() === "Night Train") ??
-    items[0] ??
-    null;
 
   return (
     <>
       <Header />
       <main>
-        <AfterDark items={items} cover={cover} variant="ayoub" />
+        <AfterDark items={items} variant="ayoub" />
       </main>
     </>
   );

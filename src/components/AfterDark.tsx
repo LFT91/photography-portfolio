@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArtistStagePrint } from "@/components/ArtistStagePrint";
 import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
 import { ProtectedImage } from "@/components/ProtectedImage";
@@ -19,7 +18,7 @@ export function AfterDark({
   variant = "fatni",
 }: {
   items: Photo[];
-  /** Required when items are present; omitted for empty collections. */
+  /** Required for Fatni entrance gate when items are present. */
   cover?: Photo | null;
   /** Ayoub gets distinct copy; Fatni keeps the original entrance gate. */
   variant?: "fatni" | "ayoub";
@@ -45,19 +44,16 @@ export function AfterDark({
     return (
       <div className="min-h-svh bg-ink pt-16 sm:pt-20">
         <div className="border-b border-line px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-7xl">
-            <p className="mb-3 font-brand text-sm tracking-[0.28em] text-ember uppercase">
-              Project
-            </p>
+          <div className="mx-auto max-w-2xl text-center">
             <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
               After Dark
             </h1>
-            <p className="mt-6 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
+            <p className="mx-auto mt-5 max-w-xl font-brand text-sm leading-[1.8] text-paper-dim sm:text-[0.95rem]">
               {ayoub
                 ? AYOUB_STATEMENT
                 : "A view of the world after nightfall — its rhythm and atmosphere."}
             </p>
-            <p className="mt-10 font-brand text-paper-dim">
+            <p className="mt-8 font-brand text-paper-dim">
               No photographs in this project yet.
             </p>
           </div>
@@ -67,67 +63,27 @@ export function AfterDark({
     );
   }
 
-  // Ayoub: Night Train introduction then gallery in one scrollable page (no second ENTER).
-  // Count is always the live After Dark membership length — never hard-code a future total.
+  // Ayoub: typographic project wall → gallery, no cover image.
   if (ayoub) {
     const count = items.length;
     const countLabel =
-      count === 1 ? "1 photograph ↓" : `${count} photographs ↓`;
-
-    const scrollToGallery = () => {
-      document
-        .getElementById("after-dark-photographs")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
+      count === 1 ? "1 photograph" : `${count} photographs`;
 
     return (
       <div className="min-h-svh bg-ink">
-        {cover ? (
-          <section className="relative flex flex-col items-center justify-center bg-ink px-3 pb-3 pt-20 sm:px-6 sm:pb-4 sm:pt-24">
-            <div className="relative inline-flex max-w-full">
-              <ArtistStagePrint
-                src={cover.src}
-                alt={cover.title}
-                priority
-                mode="width"
-                blend="night"
-              />
-              <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-5 text-center sm:px-8">
-                <h1 className="animate-rise delay-1 font-display text-4xl italic leading-[1.15] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.75)] sm:text-5xl">
-                  After Dark
-                </h1>
-                <p className="animate-rise delay-2 mt-6 max-w-md font-brand text-sm leading-[1.75] text-white/78 drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)] sm:text-[0.95rem]">
-                  {AYOUB_STATEMENT}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={scrollToGallery}
-                className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 font-brand text-sm tracking-[0.06em] text-white/55 transition-colors hover:text-white/80 sm:bottom-4 sm:text-[0.95rem]"
-              >
-                {countLabel}
-              </button>
-            </div>
-          </section>
-        ) : (
-          <div className="px-5 pb-3 pt-20 sm:px-8 sm:pb-4 sm:pt-24">
-            <div className="mx-auto max-w-7xl text-center sm:text-left">
-              <h1 className="font-display text-3xl italic text-paper sm:text-4xl">
-                After Dark
-              </h1>
-              <p className="mt-6 max-w-lg font-brand text-sm leading-[1.75] text-paper-dim sm:text-[0.95rem]">
-                {AYOUB_STATEMENT}
-              </p>
-              <button
-                type="button"
-                onClick={scrollToGallery}
-                className="mt-8 font-brand text-sm tracking-[0.06em] text-white/55 transition-colors hover:text-white/80 sm:text-[0.95rem]"
-              >
-                {countLabel}
-              </button>
-            </div>
+        <header className="px-5 pt-[4.75rem] pb-5 sm:px-8 sm:pt-[5.5rem] sm:pb-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h1 className="animate-rise delay-1 font-display text-[2.75rem] italic leading-[1.08] text-paper sm:text-5xl">
+              After Dark
+            </h1>
+            <p className="animate-rise delay-2 mx-auto mt-5 max-w-xl font-brand text-[0.95rem] leading-[1.8] text-paper-dim sm:mt-6 sm:text-base sm:leading-[1.85]">
+              {AYOUB_STATEMENT}
+            </p>
+            <p className="animate-rise delay-3 mt-4 font-brand text-xs tracking-[0.14em] text-fog uppercase">
+              {countLabel}
+            </p>
           </div>
-        )}
+        </header>
 
         <Gallery
           lockedCategory="After Dark"

@@ -1,4 +1,5 @@
 import type { Photo, PhotoCategory } from "@/data/photos";
+import { resolvePhotoUrl } from "@/lib/photo-url";
 
 export {
   AYOUB_SITE_ID,
@@ -48,7 +49,7 @@ export function isPhotoCategory(value: string): value is PhotoCategory {
 export function mapDbPhoto(row: DbPhoto): Photo {
   return {
     id: row.id,
-    src: row.public_url,
+    src: resolvePhotoUrl(row.public_url),
     title: row.title,
     categories: row.categories.filter(isPhotoCategory),
     sortOrder: row.sort_order,
@@ -81,7 +82,7 @@ export function mapCollectionMemberships(
       acc = {
         photo: {
           id: p.id,
-          src: p.public_url,
+          src: resolvePhotoUrl(p.public_url),
           title: p.title,
           categories: [],
           collectionOrders: {},

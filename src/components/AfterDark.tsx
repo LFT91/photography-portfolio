@@ -44,11 +44,11 @@ export function AfterDark({
     return (
       <div className="min-h-svh bg-ink pt-16 sm:pt-20">
         <div className="border-b border-line px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto max-w-3xl text-center sm:max-w-4xl">
             <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
               After Dark
             </h1>
-            <p className="mx-auto mt-5 max-w-xl font-brand text-lg leading-[1.75] text-paper/90 sm:text-[1.25rem] sm:leading-[1.8]">
+            <p className="mx-auto mt-5 max-w-3xl font-brand text-lg leading-[1.75] text-paper/90 sm:max-w-4xl sm:text-[1.25rem] sm:leading-[1.8]">
               {ayoub
                 ? AYOUB_STATEMENT
                 : "A view of the world after nightfall — its rhythm and atmosphere."}

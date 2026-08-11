@@ -11,7 +11,7 @@ const FATNI_STATEMENT =
   "After Dark series is a project showcasing the artist's vision of the world after nightfall. He has been fascinated by the world after dark for a long time due to its unique rhythm and atmosphere.";
 
 const AYOUB_STATEMENT =
-  "After Dark is the city at night when it stops feeling ordinary. Lit doorways and empty streets hold people in brief scenes that feel close, and a little strange.";
+  "After Dark brings together photographs made in those moments when reality seems to shift slightly out of register. Made over several years, the series follows that instability across different places, encounters and conditions.";
 
 export function AfterDark({
   items,

@@ -39,7 +39,6 @@ export function AdminLibraryWorkspace({ items }: { items: Photo[] }) {
           intro="Inline Fatni editing — upload, replace, delete, titles, display scale, and reorder. Collection membership is managed under Collections."
           tightTop
           items={items}
-          highlightAfterDark
         />
       </main>
       <Footer />

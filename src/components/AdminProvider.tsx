@@ -49,6 +49,11 @@ export type EditDraft = {
   patches: Record<string, PhotoPatch>;
   /** Category / room key → ordered photo ids (server + pending localIds). */
   orders: Record<string, string[]>;
+  /**
+   * Category / room key → photo ids to unlink from that collection on Save.
+   * Master photo stays in the library (Unassigned / Hold).
+   */
+  removals: Record<string, string[]>;
   uploads: PendingUpload[];
   /** Existing photo id → staged replacement file. */
   replaces: Record<string, PendingReplace>;
@@ -57,6 +62,7 @@ export type EditDraft = {
 const emptyDraft = (): EditDraft => ({
   patches: {},
   orders: {},
+  removals: {},
   uploads: [],
   replaces: {},
 });
@@ -65,6 +71,7 @@ function draftIsDirty(draft: EditDraft) {
   return (
     draft.uploads.length > 0 ||
     Object.keys(draft.orders).length > 0 ||
+    Object.keys(draft.removals).length > 0 ||
     Object.keys(draft.patches).length > 0 ||
     Object.keys(draft.replaces).length > 0
   );
@@ -81,9 +88,11 @@ export function applyDraftToList(
   /** Post-save bridge orders — keep UI stable while router.refresh() lands. */
   orderBridge: Record<string, string[]> = {},
 ): Photo[] {
+  const removed = new Set(draft.removals[viewKey] ?? []);
   const patched = source
     .filter((p) => {
       if (!p.id) return true;
+      if (removed.has(p.id)) return false;
       return !draft.patches[p.id]?.deleted;
     })
     .map((p) => {
@@ -170,7 +179,8 @@ type AdminContextValue = {
   ) => void;
   setPhotoTitle: (photo: Photo, title: string) => void;
   setPhotoScale: (photo: Photo, scale: number) => void;
-  markDeleted: (photo: Photo) => void;
+  /** Stage unlink from a collection (Unassigned after Save). Not a hard delete. */
+  removeFromCollection: (photo: Photo, viewKey: PhotoCategory) => void;
   setViewOrder: (viewKey: PhotoCategory, ordered: Photo[]) => void;
   queueUpload: (file: File, categories: PhotoCategory[]) => string | null;
   queueReplace: (photo: Photo, file: File) => string | null;
@@ -339,15 +349,41 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const markDeleted = useCallback((photo: Photo) => {
-    if (!photo.id) return;
-    if (photo.id.startsWith("pending:")) {
+  const removeFromCollection = useCallback(
+    (photo: Photo, viewKey: PhotoCategory) => {
+      if (!photo.id) return;
+      if (photo.id.startsWith("pending:")) {
+        setDraft((d) => {
+          const doomed = d.uploads.find((u) => u.localId === photo.id);
+          if (doomed) URL.revokeObjectURL(doomed.previewUrl);
+          return {
+            ...d,
+            uploads: d.uploads.filter((u) => u.localId !== photo.id),
+            orders: Object.fromEntries(
+              Object.entries(d.orders).map(([key, ids]) => [
+                key,
+                ids.filter((id) => id !== photo.id),
+              ]),
+            ),
+            removals: Object.fromEntries(
+              Object.entries(d.removals).map(([key, ids]) => [
+                key,
+                ids.filter((id) => id !== photo.id),
+              ]),
+            ),
+          };
+        });
+        return;
+      }
       setDraft((d) => {
-        const doomed = d.uploads.find((u) => u.localId === photo.id);
-        if (doomed) URL.revokeObjectURL(doomed.previewUrl);
+        const existing = d.removals[viewKey] ?? [];
+        if (existing.includes(photo.id!)) return d;
         return {
           ...d,
-          uploads: d.uploads.filter((u) => u.localId !== photo.id),
+          removals: {
+            ...d.removals,
+            [viewKey]: [...existing, photo.id!],
+          },
           orders: Object.fromEntries(
             Object.entries(d.orders).map(([key, ids]) => [
               key,
@@ -356,22 +392,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           ),
         };
       });
-      return;
-    }
-    setDraft((d) => ({
-      ...d,
-      patches: {
-        ...d.patches,
-        [photo.id!]: { ...d.patches[photo.id!], deleted: true },
-      },
-      orders: Object.fromEntries(
-        Object.entries(d.orders).map(([key, ids]) => [
-          key,
-          ids.filter((id) => id !== photo.id),
-        ]),
-      ),
-    }));
-  }, []);
+    },
+    [],
+  );
 
   const setViewOrder = useCallback(
     (viewKey: PhotoCategory, ordered: Photo[]) => {
@@ -544,19 +567,30 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 2. Deletes
-      for (const [id, patch] of Object.entries(current.patches)) {
-        if (!patch.deleted) continue;
-        const { data: row } = await supabase
-          .from("photos")
-          .select("storage_path")
-          .eq("id", id)
+      // 2. Collection removals — unlink from the room; master photo stays (Unassigned)
+      const activeSiteId = getActiveSiteId();
+      for (const [viewKey, ids] of Object.entries(current.removals)) {
+        if (!ids.length) continue;
+        const { data: collection, error: collectionError } = await supabase
+          .from("collections")
+          .select("id")
+          .eq("site_id", activeSiteId)
+          .eq("title", viewKey)
           .maybeSingle();
-        if (row?.storage_path && !row.storage_path.startsWith("images/")) {
-          await supabase.storage.from("photos").remove([row.storage_path]);
+        if (collectionError) throw new Error(collectionError.message);
+        if (!collection?.id) {
+          throw new Error(
+            `No ${activeSiteId} collection found for “${viewKey}”. Removals were not saved.`,
+          );
         }
-        const { error } = await supabase.from("photos").delete().eq("id", id);
-        if (error) throw new Error(error.message);
+        for (const photoId of ids) {
+          const { error: unlinkError } = await supabase
+            .from("collection_photos")
+            .delete()
+            .eq("collection_id", collection.id)
+            .eq("photo_id", photoId);
+          if (unlinkError) throw new Error(unlinkError.message);
+        }
       }
 
       // 3. File replacements (keep same row / title / order)
@@ -611,7 +645,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
       // 5. Reorders — write exact visual order as contiguous collection_photos.sort_order
       //    on the active site (Fatni or Ayoub). Fail closed if reload verification fails.
-      const activeSiteId = getActiveSiteId();
       for (const [viewKey, ids] of Object.entries(current.orders)) {
         const resolved = ids
           .map((id) => (id.startsWith("pending:") ? idMap.get(id) : id))
@@ -718,7 +751,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       clearOrderBridgeIfMatched,
       setPhotoTitle,
       setPhotoScale,
-      markDeleted,
+      removeFromCollection,
       setViewOrder,
       queueUpload,
       queueReplace,
@@ -741,7 +774,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       clearOrderBridgeIfMatched,
       setPhotoTitle,
       setPhotoScale,
-      markDeleted,
+      removeFromCollection,
       setViewOrder,
       queueUpload,
       queueReplace,

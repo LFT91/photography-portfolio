@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { CollectionAdjacentNav } from "@/components/CollectionAdjacentNav";
 import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
@@ -37,7 +37,7 @@ export default async function FatniCollectionPage({ params }: PageProps) {
   const { slug } = await params;
 
   if (slug === "after-dark") {
-    redirect("/after-dark");
+    notFound();
   }
 
   const def = fatniDefBySlug(slug);

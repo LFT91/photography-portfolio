@@ -48,7 +48,7 @@ export function AfterDark({
             <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
               After Dark
             </h1>
-            <p className="mx-auto mt-5 max-w-xl font-brand text-base leading-[1.85] text-paper/90 sm:text-[1.05rem]">
+            <p className="mx-auto mt-5 max-w-xl font-brand text-lg leading-[1.75] text-paper/90 sm:text-[1.25rem] sm:leading-[1.8]">
               {ayoub
                 ? AYOUB_STATEMENT
                 : "A view of the world after nightfall — its rhythm and atmosphere."}
@@ -76,10 +76,10 @@ export function AfterDark({
             <h1 className="animate-rise delay-1 font-display text-[2.75rem] italic leading-[1.08] text-paper sm:text-5xl">
               After Dark
             </h1>
-            <p className="animate-rise delay-2 mx-auto mt-5 max-w-xl font-brand text-base leading-[1.85] text-paper/90 sm:mt-6 sm:text-[1.05rem] sm:leading-[1.9]">
+            <p className="animate-rise delay-2 mx-auto mt-5 max-w-xl font-brand text-lg leading-[1.75] text-paper/90 sm:mt-6 sm:text-[1.25rem] sm:leading-[1.8]">
               {AYOUB_STATEMENT}
             </p>
-            <p className="animate-rise delay-3 mt-5 font-brand text-xs tracking-[0.16em] text-fog uppercase">
+            <p className="animate-rise delay-3 mt-5 font-brand text-sm tracking-[0.14em] text-fog uppercase">
               {countLabel}
             </p>
           </div>

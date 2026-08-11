@@ -20,6 +20,7 @@ import {
   planUnassignedAllocation,
   type MembershipRef,
 } from "@/lib/unassigned-pool";
+import { resolvePhotoUrl } from "@/lib/photo-url";
 
 type SiteRow = { id: string; name: string };
 type CollectionRow = {
@@ -1330,7 +1331,7 @@ export function CollectionManager() {
               <div className="relative mx-10 max-h-[min(70vh,720px)] w-full max-w-3xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={holdPreviewPhoto.public_url}
+                  src={resolvePhotoUrl(holdPreviewPhoto.public_url)}
                   alt={holdPreviewPhoto.title}
                   className="mx-auto max-h-[min(70vh,720px)] w-auto max-w-full object-contain"
                 />

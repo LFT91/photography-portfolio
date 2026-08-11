@@ -18,6 +18,7 @@ import {
   type DbPhoto,
 } from "@/lib/photo-map";
 import { FATNI_SITE_ID, getActiveSiteId, isFatniSite } from "@/lib/site";
+import { resolvePhotoUrl } from "@/lib/photo-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CollectionQueryRow = {
@@ -212,7 +213,7 @@ function coverFromMemberships(
     const raw = link.photo;
     const photo = Array.isArray(raw) ? raw[0] : raw;
     if (!photo?.public_url) continue;
-    return { src: photo.public_url, title: photo.title };
+    return { src: resolvePhotoUrl(photo.public_url), title: photo.title };
   }
   return null;
 }

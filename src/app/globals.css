@@ -182,6 +182,11 @@ body.is-gallery-dragging .gallery-item.is-editing img {
   opacity: 1 !important;
 }
 
+.gallery-item.is-selected {
+  outline: 1px solid color-mix(in srgb, var(--ember, #c45c26) 85%, transparent);
+  outline-offset: 3px;
+}
+
 @keyframes lightbox-in {
   from {
     opacity: 0;

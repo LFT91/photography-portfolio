@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useEffect,
   useLayoutEffect,
@@ -21,6 +20,11 @@ import {
   type Photo,
   type PhotoCategory,
 } from "@/data/photos";
+import {
+  applyExactSwaps,
+  indicesForKeys,
+  resolveMultiSwapDest,
+} from "@/lib/gallery-reorder";
 import { photoOrderInCategory } from "@/lib/photo-map";
 
 function Lightbox({
@@ -458,6 +462,10 @@ function GalleryCard({
   busy,
   baseCellWidth,
   cols,
+  selected,
+  selectedKeys,
+  onSelect,
+  onSelectRow,
   onMove,
   onRemove,
   onScale,
@@ -473,11 +481,18 @@ function GalleryCard({
   busy: boolean;
   baseCellWidth: number;
   cols: number;
+  selected: boolean;
+  selectedKeys: readonly string[];
+  onSelect: (
+    key: string,
+    mods: { toggle: boolean; range: boolean },
+  ) => void;
+  onSelectRow: (index: number) => void;
   onMove: (from: number, dir: "up" | "down" | "left" | "right") => void;
   onRemove: (photo: Photo) => void;
   onScale: (photo: Photo, next: number) => void;
   onTitle: (photo: Photo, title: string) => void;
-  onDropAt: (fromKey: string, toKey: string) => void;
+  onDropAt: (fromKeys: string[], toKey: string) => void;
   /** Ayoub: one column only — ignore displayScale spans. */
   uniformColumn?: boolean;
 }) {
@@ -626,7 +641,7 @@ function GalleryCard({
       ref={ref}
       className={`gallery-item group relative w-full min-w-0 ${
         editing ? "is-editing" : ""
-      } ${pending ? "opacity-90" : ""}`}
+      } ${selected ? "is-selected" : ""} ${pending ? "opacity-90" : ""}`}
       style={{
         transitionDelay: `${(index % 6) * 25}ms`,
         gridColumn: `span ${span} / span ${span}`,
@@ -654,9 +669,26 @@ function GalleryCard({
           ? (e) => {
               e.preventDefault();
               e.currentTarget.classList.remove("ring-1", "ring-ember/70");
-              const fromKey = e.dataTransfer.getData("text/photo-key");
+              const raw = e.dataTransfer.getData("text/photo-keys");
+              let fromKeys: string[] = [];
+              if (raw) {
+                try {
+                  const parsed = JSON.parse(raw) as unknown;
+                  if (Array.isArray(parsed)) {
+                    fromKeys = parsed.filter(
+                      (k): k is string => typeof k === "string",
+                    );
+                  }
+                } catch {
+                  fromKeys = [];
+                }
+              }
+              if (fromKeys.length === 0) {
+                const single = e.dataTransfer.getData("text/photo-key");
+                if (single) fromKeys = [single];
+              }
               const toKey = photoKey(photo);
-              if (fromKey && fromKey !== toKey) onDropAt(fromKey, toKey);
+              if (fromKeys.length) onDropAt(fromKeys, toKey);
             }
           : undefined
       }
@@ -712,7 +744,15 @@ function GalleryCard({
                     return;
                   }
                   markInteraction();
-                  e.dataTransfer.setData("text/photo-key", photoKey(photo));
+                  const key = photoKey(photo);
+                  const keys = selectedKeys.includes(key)
+                    ? [...selectedKeys]
+                    : [key];
+                  e.dataTransfer.setData("text/photo-key", key);
+                  e.dataTransfer.setData(
+                    "text/photo-keys",
+                    JSON.stringify(keys),
+                  );
                   e.dataTransfer.effectAllowed = "move";
                   const card = ref.current;
                   card?.classList.add("is-drag-source");
@@ -724,6 +764,13 @@ function GalleryCard({
                     ghost.style.width = `${card?.offsetWidth ?? 200}px`;
                     ghost.style.opacity = "0.9";
                     ghost.style.pointerEvents = "none";
+                    if (keys.length > 1) {
+                      const badge = document.createElement("div");
+                      badge.textContent = String(keys.length);
+                      badge.style.cssText =
+                        "position:absolute;top:8px;right:8px;background:#c45c26;color:#fff;font:600 12px/1.2 system-ui,sans-serif;padding:4px 7px;border-radius:999px;";
+                      ghost.appendChild(badge);
+                    }
                     document.body.appendChild(ghost);
                     e.dataTransfer.setDragImage(
                       ghost,
@@ -760,7 +807,20 @@ function GalleryCard({
                     clearOpenTimer();
                     return;
                   }
+                  const toggle = e.metaKey || e.ctrlKey;
+                  const range = e.shiftKey;
+                  if (toggle || range) {
+                    clearOpenTimer();
+                    markInteraction();
+                    onSelect(photoKey(photo), { toggle, range });
+                    window.setTimeout(() => {
+                      suppressOpenRef.current = false;
+                    }, 0);
+                    return;
+                  }
                   clearOpenTimer();
+                  // Plain click selects this photo only (edit mode).
+                  onSelect(photoKey(photo), { toggle: false, range: false });
                   // Delay so double-click can reset size without opening.
                   openClickTimer.current = window.setTimeout(() => {
                     openClickTimer.current = null;
@@ -1007,6 +1067,16 @@ function GalleryCard({
             >
               →
             </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onSelectRow(index)}
+              className="border border-line bg-ink/85 px-2 py-1 font-brand text-xs tracking-[0.06em] text-paper-dim transition-colors hover:text-paper disabled:opacity-30"
+              aria-label="Select this grid row"
+              title="Select entire row"
+            >
+              Row
+            </button>
             <span className="mx-1 inline-flex items-center gap-0.5 border border-line bg-ink/85 px-1 py-0.5">
               <span className="px-1 text-fog" aria-hidden title="Zoom">
                 <svg
@@ -1102,7 +1172,6 @@ export function Gallery({
   compactTop = false,
   sectionId,
   items,
-  highlightAfterDark = false,
   presentation = "default",
 }: {
   title?: string;
@@ -1115,8 +1184,6 @@ export function Gallery({
   /** Optional DOM id for in-page anchors. */
   sectionId?: string;
   items?: Photo[];
-  /** Show After Dark project link on the far right in ember. */
-  highlightAfterDark?: boolean;
   /**
    * default — Fatni archive 3-column gallery (2 on tablet).
    * ayoub — 2-column editorial on tablet/desktop, wider max width, quieter lightbox.
@@ -1130,7 +1197,7 @@ export function Gallery({
     saving,
     setPhotoTitle,
     setPhotoScale,
-    markDeleted,
+    removeFromCollection,
     setViewOrder,
     clearOrderBridgeIfMatched,
   } = useAdmin();
@@ -1145,13 +1212,26 @@ export function Gallery({
   );
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const selectionAnchorRef = useRef<string | null>(null);
 
   const room = lockedCategory ?? filter;
+
+  useEffect(() => {
+    setSelectedKeys([]);
+    selectionAnchorRef.current = null;
+  }, [room, editing]);
 
   const filtered = useMemo(() => {
     const list = source.filter((p) => photoInCategory(p, room));
     return applyDraftToList(list, room, draft, orderBridge);
   }, [draft, orderBridge, room, source]);
+
+  const keyToIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((p, i) => map.set(photoKey(p), i));
+    return map;
+  }, [filtered]);
 
   useEffect(() => {
     const serverIds = source
@@ -1172,6 +1252,46 @@ export function Gallery({
   const openPhoto = (photo: Photo) => {
     const i = filtered.findIndex((p) => p.src === photo.src);
     if (i >= 0) setActiveIndex(i);
+  };
+
+  const onSelect = (
+    key: string,
+    mods: { toggle: boolean; range: boolean },
+  ) => {
+    const index = keyToIndex.get(key);
+    if (index == null) return;
+
+    if (mods.range && selectionAnchorRef.current) {
+      const anchor = keyToIndex.get(selectionAnchorRef.current);
+      if (anchor != null) {
+        const lo = Math.min(anchor, index);
+        const hi = Math.max(anchor, index);
+        const rangeKeys = filtered.slice(lo, hi + 1).map(photoKey);
+        setSelectedKeys(rangeKeys);
+        return;
+      }
+    }
+
+    if (mods.toggle) {
+      setSelectedKeys((prev) => {
+        if (prev.includes(key)) return prev.filter((k) => k !== key);
+        return [...prev, key];
+      });
+      selectionAnchorRef.current = key;
+      return;
+    }
+
+    setSelectedKeys([key]);
+    selectionAnchorRef.current = key;
+  };
+
+  const onSelectRow = (index: number) => {
+    const row = Math.floor(index / cols);
+    const start = row * cols;
+    const end = Math.min(start + cols, filtered.length);
+    const keys = filtered.slice(start, end).map(photoKey);
+    setSelectedKeys(keys);
+    selectionAnchorRef.current = keys[0] ?? null;
   };
 
   const onMove = (from: number, dir: "up" | "down" | "left" | "right") => {
@@ -1201,24 +1321,35 @@ export function Gallery({
     setViewOrder(room, next);
   };
 
-  const onDropAt = (fromKey: string, toKey: string) => {
-    if (!fromKey || !toKey || fromKey === toKey) return;
-    const from = filtered.findIndex((p) => photoKey(p) === fromKey);
-    const to = filtered.findIndex((p) => photoKey(p) === toKey);
-    if (from < 0 || to < 0 || from === to) return;
-    const next = [...filtered];
-    const a = next[from];
-    const b = next[to];
-    if (!a || !b) return;
-    // Exact swap only — do not shift intervening photos.
-    next[from] = b;
-    next[to] = a;
+  const onDropAt = (fromKeys: string[], toKey: string) => {
+    if (!fromKeys.length || !toKey) return;
+    const dropIndex = keyToIndex.get(toKey);
+    if (dropIndex == null) return;
+
+    const sourceIndices = indicesForKeys(fromKeys, keyToIndex);
+    if (!sourceIndices.length) return;
+
+    const destIndices = resolveMultiSwapDest(
+      filtered.length,
+      sourceIndices,
+      dropIndex,
+    );
+    if (!destIndices) return;
+
+    const next = applyExactSwaps(filtered, sourceIndices, destIndices);
+    if (!next) return;
     setViewOrder(room, next);
   };
 
   const onRemove = (photo: Photo) => {
-    if (!window.confirm(`Remove “${photo.title}”? (Save to confirm)`)) return;
-    markDeleted(photo);
+    if (
+      !window.confirm(
+        `Remove “${photo.title}” from ${room}? It will move to Unassigned / Hold after you Save.`,
+      )
+    ) {
+      return;
+    }
+    removeFromCollection(photo, room);
   };
 
   const onScale = (photo: Photo, next: number) => {
@@ -1230,7 +1361,7 @@ export function Gallery({
   };
 
   const showHeader =
-    Boolean(title) || (showFilters && !lockedCategory) || highlightAfterDark;
+    Boolean(title) || (showFilters && !lockedCategory);
 
   return (
     <section
@@ -1286,14 +1417,6 @@ export function Gallery({
                     </button>
                   ))}
                 </div>
-                {highlightAfterDark ? (
-                  <Link
-                    href="/after-dark"
-                    className="font-brand w-full text-center text-sm tracking-[0.08em] text-ember transition-colors hover:text-[#e0c08a] md:w-auto md:text-left"
-                  >
-                    After Dark
-                  </Link>
-                ) : null}
               </div>
             ) : null}
           </div>
@@ -1303,9 +1426,14 @@ export function Gallery({
           <>
             <GalleryUploadZone room={room} onError={setAdminError} />
             <p className="mb-6 font-brand text-sm text-fog">
-              Drag to swap · ←↑↓→ swap on the grid · loupe or handles to resize
-              within a cell · double-click resets to 100% · ✕ stages delete.
-              Save or Cancel below.
+              Click to select · ⌘/Ctrl+click toggle · Shift+click range · Row
+              selects the grid row · drag selection to swap exactly with the
+              same number of photos · ←↑↓→ swap one · loupe or handles to
+              resize · double-click resets to 100% · ✕ removes from this
+              collection (Unassigned after Save). Save or Cancel below.
+              {selectedKeys.length > 0
+                ? ` · ${selectedKeys.length} selected`
+                : ""}
             </p>
           </>
         ) : null}
@@ -1337,6 +1465,10 @@ export function Gallery({
                 busy={saving}
                 baseCellWidth={baseCellWidth}
                 cols={cols}
+                selected={selectedKeys.includes(photoKey(photo))}
+                selectedKeys={selectedKeys}
+                onSelect={onSelect}
+                onSelectRow={onSelectRow}
                 onMove={onMove}
                 onRemove={onRemove}
                 onScale={onScale}

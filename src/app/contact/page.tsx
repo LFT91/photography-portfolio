@@ -2,15 +2,18 @@ import type { Metadata } from "next";
 import { Contact } from "@/components/Contact";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getActiveSite, sitePageTitle } from "@/lib/site";
+import { FATNI_CONTACT_DESCRIPTION, publicPageMetadata } from "@/lib/seo";
+import { getActiveSite, isAyoubSite } from "@/lib/site";
 
 const site = getActiveSite();
 
-export const metadata: Metadata = {
-  title: sitePageTitle("Contact"),
-  description: `Get in touch with ${site.name}.`,
-  alternates: { canonical: "/contact" },
-};
+export const metadata: Metadata = publicPageMetadata({
+  title: "Contact",
+  description: isAyoubSite()
+    ? `Get in touch with ${site.name}.`
+    : FATNI_CONTACT_DESCRIPTION,
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (

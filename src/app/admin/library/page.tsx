@@ -5,7 +5,7 @@ import { getPhotos } from "@/lib/photos";
 import { isFatniSite } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Library | Admin | Fatni Photography",
+  title: { absolute: "Library | Admin | Fatni Photography" },
   robots: { index: false, follow: false },
 };
 

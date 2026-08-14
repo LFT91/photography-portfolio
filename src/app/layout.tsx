@@ -3,7 +3,19 @@ import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
 import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
 import { SiteAdminBar } from "@/components/SiteAdminBar";
-import { getActiveSite, getPublicSiteUrl } from "@/lib/site";
+import {
+  FATNI_HOME_DESCRIPTION,
+  FATNI_HOME_TITLE,
+  SHARE_IMAGE,
+  indexingRobots,
+} from "@/lib/seo";
+import {
+  FATNI_PUBLIC_URL,
+  PHOTOGRAPHER_NAME,
+  getActiveSite,
+  getPublicSiteUrl,
+  isAyoubSite,
+} from "@/lib/site";
 import "./globals.css";
 
 const brand = Cormorant_Garamond({
@@ -23,14 +35,7 @@ const display = Instrument_Serif({
 const site = getActiveSite();
 const siteUrl = getPublicSiteUrl();
 
-const shareImage = {
-  url: "/images/startrails.jpg",
-  width: 1920,
-  height: 1280,
-  alt: "Star trails over a mountain landscape",
-};
-
-export const metadata: Metadata = {
+const ayoubMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: site.name,
   description: site.description,
@@ -40,15 +45,45 @@ export const metadata: Metadata = {
     type: "website",
     siteName: site.name,
     url: siteUrl,
-    images: [shareImage],
+    images: [SHARE_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: site.name,
     description: site.ogDescription,
-    images: [shareImage.url],
+    images: [SHARE_IMAGE.url],
   },
 };
+
+const fatniMetadata: Metadata = {
+  metadataBase: new URL(FATNI_PUBLIC_URL),
+  title: {
+    default: FATNI_HOME_TITLE,
+    template: "%s | Fatni Photography",
+  },
+  description: FATNI_HOME_DESCRIPTION,
+  applicationName: site.name,
+  authors: [{ name: PHOTOGRAPHER_NAME, url: `${FATNI_PUBLIC_URL}/about` }],
+  creator: PHOTOGRAPHER_NAME,
+  publisher: site.name,
+  robots: indexingRobots(),
+  openGraph: {
+    title: FATNI_HOME_TITLE,
+    description: FATNI_HOME_DESCRIPTION,
+    type: "website",
+    siteName: site.name,
+    locale: "en",
+    images: [SHARE_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: FATNI_HOME_TITLE,
+    description: FATNI_HOME_DESCRIPTION,
+    images: [SHARE_IMAGE.url],
+  },
+};
+
+export const metadata: Metadata = isAyoubSite() ? ayoubMetadata : fatniMetadata;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

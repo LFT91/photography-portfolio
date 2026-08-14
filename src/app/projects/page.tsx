@@ -4,11 +4,14 @@ import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getCollectionPhotos } from "@/lib/photos";
-import { isAyoubSite, sitePageTitle } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
+import { isAyoubSite } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: sitePageTitle("Projects"),
-};
+export const metadata: Metadata = publicPageMetadata({
+  title: "Projects",
+  description: "Photographic projects by Ayoub El Fatni.",
+  path: "/projects",
+});
 
 export const dynamic = "force-dynamic";
 

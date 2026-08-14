@@ -14,6 +14,8 @@ export type FatniCollectionDef = {
   title: PhotoCategory;
   /** Public path visitors open. */
   href: string;
+  /** Unique public meta description for this collection page. */
+  description: string;
   /**
    * Not shown on the Fatni archive index/homepage preview
    * (kept for routing / project presentation).
@@ -23,11 +25,41 @@ export type FatniCollectionDef = {
 
 /** Public Fatni archive rooms. */
 export const FATNI_PUBLIC_COLLECTIONS: readonly FatniCollectionDef[] = [
-  { slug: "nature", title: "Nature", href: "/work/nature" },
-  { slug: "urban", title: "Urban", href: "/work/urban" },
-  { slug: "astro", title: "Astro", href: "/work/astro" },
-  { slug: "street", title: "Street", href: "/work/street" },
-  { slug: "monochrome", title: "Monochrome", href: "/work/monochrome" },
+  {
+    slug: "nature",
+    title: "Nature",
+    href: "/work/nature",
+    description:
+      "Nature photography by Ayoub El Fatni, from landscapes to quieter outdoor scenes.",
+  },
+  {
+    slug: "urban",
+    title: "Urban",
+    href: "/work/urban",
+    description:
+      "Urban photography by Ayoub El Fatni, looking at cities, architecture and built space.",
+  },
+  {
+    slug: "astro",
+    title: "Astro",
+    href: "/work/astro",
+    description:
+      "Astrophotography by Ayoub El Fatni, including night-sky and star-trail work.",
+  },
+  {
+    slug: "street",
+    title: "Street",
+    href: "/work/street",
+    description:
+      "Street photography by Ayoub El Fatni, made among people, movement and public space.",
+  },
+  {
+    slug: "monochrome",
+    title: "Monochrome",
+    href: "/work/monochrome",
+    description:
+      "Monochrome photography by Ayoub El Fatni, in black and white.",
+  },
 ] as const;
 
 export type FatniCollectionSummary = {

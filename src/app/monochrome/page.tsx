@@ -4,11 +4,14 @@ import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
 import { getCollectionPhotos } from "@/lib/photos";
-import { isAyoubSite, sitePageTitle } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
+import { isAyoubSite } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: sitePageTitle("Monochrome"),
-};
+export const metadata: Metadata = publicPageMetadata({
+  title: "Monochrome",
+  description: "Monochrome photography by Ayoub El Fatni.",
+  path: "/monochrome",
+});
 
 export const dynamic = "force-dynamic";
 

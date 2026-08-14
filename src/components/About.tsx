@@ -47,7 +47,7 @@ function FatniAbout() {
 
         <div className="max-w-xl space-y-6 pt-8 sm:pt-28 sm:space-y-8">
           <p className="font-brand text-lg leading-relaxed text-paper sm:text-xl">
-            Fatni Photography is the wider photographic archive of Ayoub El
+            Fatni Photography is the broader photography portfolio of Ayoub El
             Fatni. Since 2017, I have photographed whatever made me stop:
             people, cities, landscapes, weather, architecture and the night
             sky.

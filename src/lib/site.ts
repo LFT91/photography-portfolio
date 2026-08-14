@@ -23,17 +23,19 @@ export type SiteConfig = {
 };
 
 /** Canonical production origins for cross-site nav (Focused Work / Broader Work). */
-export const FATNI_PUBLIC_URL = "https://fatni-photography.vercel.app";
+export const FATNI_PUBLIC_URL = "https://www.fatniphotography.com";
 export const AYOUB_PUBLIC_URL = "https://ayoub-el-fatni.vercel.app";
+export const PHOTOGRAPHER_NAME = "Ayoub El Fatni";
+export const FATNI_SITE_NAME = "Fatni Photography";
 
 export const SITES: Record<SiteId, SiteConfig> = {
   "fatni-photography": {
     id: "fatni-photography",
-    name: "Fatni Photography",
+    name: FATNI_SITE_NAME,
     description:
-      "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, night, and monochrome.",
+      "Photography by Ayoub El Fatni, featuring street, urban, nature, astrophotography and monochrome work.",
     ogDescription:
-      "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, and night.",
+      "Photography by Ayoub El Fatni, featuring street, urban, nature, astrophotography and monochrome work.",
     nav: [
       { href: "/work", label: "Collections" },
       { href: AYOUB_PUBLIC_URL, label: "Focused Work", external: true },
@@ -91,9 +93,39 @@ export function sitePageTitle(page?: string): string {
   return page ? `${page} | ${name}` : name;
 }
 
-/** Canonical public origin for this deployment (OG, sitemap, robots). */
+function normalizeOrigin(value: string): string {
+  return value.replace(/\/$/, "");
+}
+
+function hostnameOf(origin: string): string | null {
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Canonical public origin for this deployment (OG, sitemap, robots).
+ * Fatni always uses www.fatniphotography.com — never a Vercel preview URL.
+ */
 export function getPublicSiteUrl(): string {
+  if (isAyoubSite()) {
+    const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    if (fromEnv) return normalizeOrigin(fromEnv);
+    return AYOUB_PUBLIC_URL;
+  }
+
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return isAyoubSite() ? AYOUB_PUBLIC_URL : FATNI_PUBLIC_URL;
+  if (fromEnv) {
+    const host = hostnameOf(normalizeOrigin(fromEnv));
+    if (
+      host === "www.fatniphotography.com" ||
+      host === "fatniphotography.com"
+    ) {
+      return FATNI_PUBLIC_URL;
+    }
+  }
+
+  return FATNI_PUBLIC_URL;
 }

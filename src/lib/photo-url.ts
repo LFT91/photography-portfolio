@@ -1,3 +1,5 @@
+import { getPublicSiteUrl } from "@/lib/site";
+
 /**
  * Normalize photo URLs for <img> / next/image.
  * Relative `/images/...` rows must resolve against the active site origin
@@ -14,10 +16,7 @@ export function resolvePhotoUrl(url: string): string {
     return url;
   }
   if (url.startsWith("/")) {
-    const envBase = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "";
-    const base =
-      envBase ||
-      (typeof window !== "undefined" ? window.location.origin : "");
+    const base = getPublicSiteUrl();
     return base ? `${base}${url}` : url;
   }
   return url;

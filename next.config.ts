@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "www.fatniphotography.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "fatni-photography.vercel.app",
         pathname: "/**",
       },
@@ -24,6 +29,24 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async redirects() {
+    // Production Vercel alias only — preview hosts are git-sha / branch URLs
+    // and are not matched. The Ayoub project uses a different hostname.
+    return [
+      {
+        source: "/",
+        has: [{ type: "host", value: "fatni-photography.vercel.app" }],
+        destination: "https://www.fatniphotography.com/",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "fatni-photography.vercel.app" }],
+        destination: "https://www.fatniphotography.com/:path*",
+        permanent: true,
+      },
+    ];
   },
 };
 

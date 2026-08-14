@@ -6,7 +6,8 @@ import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
 import { fatniDefBySlug } from "@/lib/fatni-collections";
 import { getCollectionPhotos } from "@/lib/photos";
-import { getActiveSite, isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
+import { isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,11 @@ export async function generateMetadata({
   if (!def || def.special) {
     return { title: sitePageTitle("Collections") };
   }
-  return {
-    title: sitePageTitle(def.title),
-    description: `${def.title} photographs — ${getActiveSite().name}.`,
-    alternates: { canonical: def.href },
-  };
+  return publicPageMetadata({
+    title: def.title,
+    description: def.description,
+    path: def.href,
+  });
 }
 
 export default async function FatniCollectionPage({ params }: PageProps) {

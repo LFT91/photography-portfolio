@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 export const metadata: Metadata = {
-  title: "Curation review | Admin",
+  title: { absolute: "Curation review | Admin" },
   robots: {
     index: false,
     follow: false,

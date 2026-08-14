@@ -4,12 +4,41 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
-import { getActiveSite, isAyoubSite } from "@/lib/site";
+import {
+  getActiveSite,
+  isAyoubSite,
+  type SiteNavLink,
+} from "@/lib/site";
 
-function linkIsActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href !== "/" && pathname.startsWith(`${href}/`)) return true;
+function linkIsActive(pathname: string, link: SiteNavLink): boolean {
+  if (link.external) return false;
+  if (pathname === link.href) return true;
+  if (link.href !== "/" && pathname.startsWith(`${link.href}/`)) return true;
   return false;
+}
+
+function NavItem({
+  link,
+  className,
+  onNavigate,
+}: {
+  link: SiteNavLink;
+  className: string;
+  onNavigate?: () => void;
+}) {
+  if (link.external) {
+    return (
+      <a href={link.href} className={className} onClick={onNavigate}>
+        {link.label}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={link.href} className={className} onClick={onNavigate}>
+      {link.label}
+    </Link>
+  );
 }
 
 export function Header({ solid = false }: { solid?: boolean }) {
@@ -74,19 +103,17 @@ export function Header({ solid = false }: { solid?: boolean }) {
 
           <nav className="hidden items-center gap-10 md:flex">
             {links.map((link) => {
-              const active = linkIsActive(pathname, link.href);
+              const active = linkIsActive(pathname, link);
               return (
-                <Link
-                  key={link.href}
-                  href={link.href}
+                <NavItem
+                  key={`${link.label}:${link.href}`}
+                  link={link}
                   className={`font-brand text-sm tracking-[0.12em] drop-shadow-[0_1px_6px_rgba(0,0,0,0.7)] transition-colors ${
                     active
                       ? "text-white"
                       : "text-white/85 hover:text-white"
                   }`}
-                >
-                  {link.label}
-                </Link>
+                />
               );
             })}
           </nav>
@@ -129,14 +156,12 @@ export function Header({ solid = false }: { solid?: boolean }) {
       >
         <nav className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-16 sm:gap-8">
           {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setOpen(false)}
+            <NavItem
+              key={`${link.label}:${link.href}`}
+              link={link}
+              onNavigate={() => setOpen(false)}
               className="px-4 py-3 font-display text-3xl italic text-paper sm:text-4xl"
-            >
-              {link.label}
-            </Link>
+            />
           ))}
         </nav>
       </div>

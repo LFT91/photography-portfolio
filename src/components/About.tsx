@@ -1,8 +1,9 @@
 import { ProtectedImage } from "@/components/ProtectedImage";
-import { isAyoubSite } from "@/lib/site";
-
-const FATNI_SITE_URL = "https://fatni-photography.vercel.app";
-const AYOUB_SITE_URL = "https://ayoub-el-fatni.vercel.app";
+import {
+  AYOUB_PUBLIC_URL,
+  FATNI_PUBLIC_URL,
+  isAyoubSite,
+} from "@/lib/site";
 
 const awardClassName =
   "font-medium text-paper underline decoration-ember/70 decoration-1 underline-offset-4";
@@ -61,7 +62,7 @@ function FatniAbout() {
           </p>
           <p className="!mt-12 font-brand text-base leading-relaxed text-fog sm:!mt-14 sm:text-lg">
             For focused work, visit{" "}
-            <a href={AYOUB_SITE_URL} className={sisterLinkClassName}>
+            <a href={AYOUB_PUBLIC_URL} className={sisterLinkClassName}>
               Ayoub El Fatni →
             </a>
           </p>
@@ -96,7 +97,7 @@ function AyoubAbout() {
           </p>
           <p className="!mt-12 font-brand text-base leading-[1.75] text-fog sm:!mt-14 sm:text-[1.05rem]">
             For broader photographic work, visit{" "}
-            <a href={FATNI_SITE_URL} className={sisterLinkClassName}>
+            <a href={FATNI_PUBLIC_URL} className={sisterLinkClassName}>
               Fatni Photography →
             </a>
           </p>

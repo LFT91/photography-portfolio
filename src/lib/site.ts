@@ -9,6 +9,8 @@ export type SiteId = (typeof SITE_IDS)[keyof typeof SITE_IDS];
 export type SiteNavLink = {
   href: string;
   label: string;
+  /** Absolute URL to the sister site — open as a normal navigation, not a Next route. */
+  external?: boolean;
 };
 
 export type SiteConfig = {
@@ -20,6 +22,10 @@ export type SiteConfig = {
   nav: SiteNavLink[];
 };
 
+/** Canonical production origins for cross-site nav (Focused Work / Broader Work). */
+export const FATNI_PUBLIC_URL = "https://fatni-photography.vercel.app";
+export const AYOUB_PUBLIC_URL = "https://ayoub-el-fatni.vercel.app";
+
 export const SITES: Record<SiteId, SiteConfig> = {
   "fatni-photography": {
     id: "fatni-photography",
@@ -30,6 +36,7 @@ export const SITES: Record<SiteId, SiteConfig> = {
       "Photographic archive by Ayoub El Fatni — landscapes, travel, street, cities, and night.",
     nav: [
       { href: "/work", label: "Collections" },
+      { href: AYOUB_PUBLIC_URL, label: "Focused Work", external: true },
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
     ],
@@ -43,6 +50,7 @@ export const SITES: Record<SiteId, SiteConfig> = {
     nav: [
       { href: "/projects/after-dark", label: "After Dark" },
       { href: "/monochrome", label: "Monochrome" },
+      { href: FATNI_PUBLIC_URL, label: "Broader Work", external: true },
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
     ],
@@ -87,7 +95,5 @@ export function sitePageTitle(page?: string): string {
 export function getPublicSiteUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return isAyoubSite()
-    ? "https://ayoub-el-fatni.vercel.app"
-    : "https://fatni-photography.vercel.app";
+  return isAyoubSite() ? AYOUB_PUBLIC_URL : FATNI_PUBLIC_URL;
 }

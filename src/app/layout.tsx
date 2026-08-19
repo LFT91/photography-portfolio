@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
 import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
@@ -34,8 +34,32 @@ const display = Instrument_Serif({
 
 const site = getActiveSite();
 const siteUrl = getPublicSiteUrl();
+const brandingMetadata: Metadata = {
+  applicationName: site.name,
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    other: [
+      {
+        rel: "apple-touch-icon-precomposed",
+        url: "/apple-touch-icon-precomposed.png",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: site.name,
+    statusBarStyle: "black-translucent",
+  },
+};
 
 const ayoubMetadata: Metadata = {
+  ...brandingMetadata,
   metadataBase: new URL(siteUrl),
   title: site.name,
   description: site.description,
@@ -56,13 +80,13 @@ const ayoubMetadata: Metadata = {
 };
 
 const fatniMetadata: Metadata = {
+  ...brandingMetadata,
   metadataBase: new URL(FATNI_PUBLIC_URL),
   title: {
     default: FATNI_HOME_TITLE,
     template: "%s | Fatni Photography",
   },
   description: FATNI_HOME_DESCRIPTION,
-  applicationName: site.name,
   authors: [{ name: PHOTOGRAPHER_NAME, url: `${FATNI_PUBLIC_URL}/about` }],
   creator: PHOTOGRAPHER_NAME,
   publisher: site.name,
@@ -81,6 +105,10 @@ const fatniMetadata: Metadata = {
     description: FATNI_HOME_DESCRIPTION,
     images: [SHARE_IMAGE.url],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0c0e",
 };
 
 export const metadata: Metadata = isAyoubSite() ? ayoubMetadata : fatniMetadata;

@@ -19,7 +19,7 @@ export default function ContactPage() {
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
         <Contact />
       </main>
       <Footer />

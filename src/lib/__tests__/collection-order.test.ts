@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import {
   hasDuplicateSortOrders,
   isContiguousSortOrders,
-  legacyRemapExistingRanks,
   planContiguousCollectionOrder,
   sequencesMatch,
   verifyPersistedPhotoOrder,
@@ -46,8 +45,6 @@ describe("planContiguousCollectionOrder", () => {
   });
 
   it("moving an item across multiple positions works", () => {
-    const start = ["a", "b", "c", "d", "e"];
-    // move e to index 1 → a, e, b, c, d
     const visual = ["a", "e", "b", "c", "d"];
     const planned = planContiguousCollectionOrder(visual);
     assert.equal(planned[1].photo_id, "e");
@@ -134,35 +131,3 @@ describe("save/reload verification", () => {
   });
 });
 
-describe("legacy remap regression", () => {
-  it("contiguous remap can mask intent when ranks are reused; contiguous planner does not", () => {
-    // Existing ranks 0,1,2 — remap happens to equal contiguous for full sets.
-    const visual = ["c", "a", "b"];
-    const current = new Map([
-      ["a", 0],
-      ["b", 1],
-      ["c", 2],
-    ]);
-    const legacy = legacyRemapExistingRanks(visual, current);
-    const planned = planContiguousCollectionOrder(visual);
-    assert.ok(legacy);
-    assert.deepEqual(legacy, planned);
-
-    // Gapped ranks: legacy remaps [0,5,9] sorted onto visual, not 0..n-1.
-    const gapped = new Map([
-      ["a", 0],
-      ["b", 5],
-      ["c", 9],
-    ]);
-    const legacyGapped = legacyRemapExistingRanks(visual, gapped);
-    assert.ok(legacyGapped);
-    assert.deepEqual(
-      legacyGapped.map((p) => p.sort_order),
-      [0, 5, 9],
-    );
-    assert.deepEqual(
-      planContiguousCollectionOrder(visual).map((p) => p.sort_order),
-      [0, 1, 2],
-    );
-  });
-});

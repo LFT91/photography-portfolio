@@ -1,4 +1,4 @@
-import type { PhotoCategory } from "@/data/photos";
+import type { PhotoCategory } from "@/lib/photo";
 
 /**
  * Fatni public archive collections.

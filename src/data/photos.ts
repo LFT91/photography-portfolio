@@ -1,43 +1,13 @@
-import { photoOrientationRank } from "@/lib/photo-orientation";
+import type { Photo } from "@/lib/photo";
 
-export type PhotoCategory =
-  | "Nature"
-  | "Urban"
-  | "Astro"
-  | "Street"
-  | "Monochrome"
-  | "After Dark"
-  | "Selected Work";
-
-export type Photo = {
-  id?: string;
-  src: string;
-  title: string;
-  categories: PhotoCategory[];
-  sortOrder?: number;
-  /**
-   * Independent order within each collection (from collection_photos).
-   * Used when filtering by category so multi-collection membership stays correct.
-   */
-  collectionOrders?: Partial<Record<PhotoCategory, number>>;
-  storagePath?: string;
-  /** Gallery tile width relative to column (1 = full). Keeps aspect ratio. */
-  displayScale?: number;
-};
+export type { Photo, PhotoCategory } from "@/lib/photo";
+export { photoInCategory, FATNI_GALLERY_CATEGORIES as categories } from "@/lib/photo";
 
 /**
- * Fatni Work gallery filters — After Dark is a separate project;
- * Selected Work is Ayoub-only and never listed here.
+ * Development-only Fatni fixture. Production never reads this file.
+ * Enable with USE_LOCAL_CATALOG=1, or omit Supabase env in development.
  */
-export const categories: PhotoCategory[] = [
-  "Nature",
-  "Urban",
-  "Astro",
-  "Street",
-  "Monochrome",
-];
-
-export const photos: Photo[] = [
+export const localPhotos: Photo[] = [
   {
     src: "/images/DJI_0464-HDR-Pano-Edit.jpg",
     title: "Aerial Panorama",
@@ -556,22 +526,3 @@ export const photos: Photo[] = [
   },
 ];
 
-export function photoInCategory(photo: Photo, category: PhotoCategory) {
-  return photo.categories.includes(category);
-}
-
-export const afterDarkPhotos = photos
-  .filter((photo) => photoInCategory(photo, "After Dark"))
-  .sort((a, b) => {
-    const byShape = photoOrientationRank(a.src) - photoOrientationRank(b.src);
-    if (byShape !== 0) return byShape;
-    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-  });
-
-export const afterDarkCover =
-  photos.find((photo) => photo.src.includes("after-dark-cover")) ??
-  afterDarkPhotos[0] ??
-  photos[0];
-
-export const heroImage =
-  photos.find((photo) => photo.src.includes("startrails")) ?? afterDarkCover;

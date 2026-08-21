@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
-import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
-import { getCollectionPhotos } from "@/lib/photos";
+import { PhotoGrid } from "@/components/PhotoGrid";
+import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Monochrome",
   description: "Monochrome photography by Ayoub El Fatni.",
   path: "/monochrome",
 });
-
-export const dynamic = "force-dynamic";
 
 export default async function MonochromePage() {
   if (!isAyoubSite()) notFound();
@@ -23,15 +23,8 @@ export default async function MonochromePage() {
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
-        <Gallery
-          title="Monochrome"
-          showFilters={false}
-          lockedCategory="Monochrome"
-          tightTop
-          items={photos}
-          presentation="ayoub"
-        />
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
+        <PhotoGrid title="Monochrome" tightTop items={photos} layout="ayoub" />
       </main>
       <Footer />
     </>

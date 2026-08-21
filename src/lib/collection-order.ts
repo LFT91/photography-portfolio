@@ -41,26 +41,6 @@ export function sequencesMatch(
   return true;
 }
 
-/**
- * Legacy remapping used existing sort_order values sorted ascending.
- * That can diverge from the visible sequence when ranks are gapped/duplicated
- * or when only a subset of memberships is updated. Kept for regression tests.
- */
-export function legacyRemapExistingRanks(
-  visualPhotoIds: readonly string[],
-  currentById: ReadonlyMap<string, number>,
-): PlannedMembershipOrder[] | null {
-  const ranks = visualPhotoIds
-    .map((id) => currentById.get(id))
-    .filter((n): n is number => n != null)
-    .sort((a, b) => a - b);
-  if (ranks.length !== visualPhotoIds.length) return null;
-  return visualPhotoIds.map((photo_id, i) => ({
-    photo_id,
-    sort_order: ranks[i],
-  }));
-}
-
 export type OrderPersistVerification =
   | { ok: true }
   | { ok: false; detail: string };

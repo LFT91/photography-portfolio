@@ -3,17 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getCollectionPhotos } from "@/lib/photos";
+import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Projects",
   description: "Photographic projects by Ayoub El Fatni.",
   path: "/projects",
 });
-
-export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
   if (!isAyoubSite()) notFound();
@@ -24,7 +24,7 @@ export default async function ProjectsPage() {
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
         <section className="bg-ink px-5 pb-24 pt-10 sm:px-8 sm:pt-14">
           <div className="mx-auto max-w-7xl">
             <h1 className="font-display text-4xl italic text-paper sm:text-5xl">

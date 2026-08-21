@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { AdminLibraryWorkspace } from "@/components/AdminLibraryWorkspace";
-import { getPhotos } from "@/lib/photos";
+import { AdminLibraryWorkspace } from "@/components/admin/AdminLibraryWorkspace";
+import { getLibraryPhotos } from "@/lib/catalog";
 import { isFatniSite } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -9,17 +9,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const dynamic = "force-dynamic";
-
-/**
- * Fatni-only admin library — preserves the legacy inline Gallery editor
- * after public /work became a collection index.
- */
 export default async function AdminLibraryPage() {
   if (!isFatniSite()) {
     notFound();
   }
 
-  const photos = await getPhotos();
+  const photos = await getLibraryPhotos();
   return <AdminLibraryWorkspace items={photos} />;
 }

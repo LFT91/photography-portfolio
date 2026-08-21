@@ -1,4 +1,4 @@
-import type { Photo, PhotoCategory } from "@/data/photos";
+import { isPhotoCategory, type Photo, type PhotoCategory } from "@/lib/photo";
 import { resolvePhotoUrl } from "@/lib/photo-url";
 
 export {
@@ -6,16 +6,7 @@ export {
   FATNI_SITE_ID,
   getActiveSiteId,
 } from "@/lib/site";
-
-export const PHOTO_CATEGORIES: readonly PhotoCategory[] = [
-  "Nature",
-  "Urban",
-  "Astro",
-  "Street",
-  "Monochrome",
-  "After Dark",
-  "Selected Work",
-] as const;
+export { PHOTO_CATEGORIES, isPhotoCategory } from "@/lib/photo";
 
 export type DbPhoto = {
   id: string;
@@ -41,10 +32,6 @@ export type DbCollectionMembership = {
     display_scale?: number | null;
   };
 };
-
-export function isPhotoCategory(value: string): value is PhotoCategory {
-  return (PHOTO_CATEGORIES as readonly string[]).includes(value);
-}
 
 export function mapDbPhoto(row: DbPhoto): Photo {
   return {

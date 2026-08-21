@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Photos are already web-sized JPEGs on Supabase / public/. Serving them
-    // through Vercel's optimizer burns the Hobby transform quota; new source
-    // images then 402 and show as broken "?" thumbs until the cycle resets.
+    // Derivatives are pre-sized (scripts/generate-images.mjs) or rewritten
+    // through Supabase Storage transforms. Vercel image optimization stays
+    // off so Hobby transform quota is not consumed.
     unoptimized: true,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     remotePatterns: [
@@ -29,6 +29,19 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/images/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
   },
   async redirects() {
     // Production Vercel alias only — preview hosts are git-sha / branch URLs

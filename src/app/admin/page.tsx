@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminPanel } from "@/components/AdminPanel";
+import { AdminPanel } from "@/components/admin/AdminPanel";
 
 export const metadata: Metadata = {
   title: { absolute: "Admin | Fatni Photography" },
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AdminPage() {
   return (
-    <main className="min-h-svh bg-ink">
+    <main id="main" className="min-h-svh bg-ink">
       <AdminPanel />
     </main>
   );

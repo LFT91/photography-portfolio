@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { CollectionIndex } from "@/components/CollectionIndex";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { getFatniCollectionSummaries } from "@/lib/catalog";
 import { FATNI_WORK_DESCRIPTION, publicPageMetadata } from "@/lib/seo";
-import { getFatniCollectionSummaries } from "@/lib/photos";
 import { isAyoubSite } from "@/lib/site";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = publicPageMetadata({
   title: isAyoubSite() ? "After Dark" : "Collections",
@@ -15,11 +17,8 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/work",
 });
 
-export const dynamic = "force-dynamic";
-
 export default async function WorkPage() {
   if (isAyoubSite()) {
-    // Selected Work was retired; send admins/bookmarks to the live project.
     redirect("/projects/after-dark");
   }
 
@@ -28,7 +27,7 @@ export default async function WorkPage() {
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
         <CollectionIndex
           collections={collections}
           heading="Collections"

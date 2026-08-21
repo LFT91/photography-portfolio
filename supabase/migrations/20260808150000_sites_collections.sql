@@ -2,8 +2,9 @@
 -- Does NOT drop or rewrite photos.categories / photos.sort_order / night_kind.
 -- Does NOT change application code. Safe for current production after this runs.
 --
--- Admin allow-list uses auth user: 88b0fa67-b865-4c1e-ad1a-25a35efd92b5
--- Do not apply remotely until explicitly requested.
+-- Seeds the current production admin when that Auth user already exists.
+-- A missing user is skipped (NOTICE) so a greenfield database can apply
+-- this history, then run supabase/bootstrap-admin.sql after creating a user.
 --
 -- After applying, run:
 --   supabase/validation/20260808150000_sites_collections_validation.sql
@@ -62,14 +63,14 @@ begin
   end;
 
   if not exists (select 1 from auth.users where id = admin_user_id) then
-    raise exception
-      'Phase 1 migration blocked: no auth.users row for %. Check Authentication → Users.',
+    raise notice
+      'Skipping app_admins seed: no auth.users row for %. After creating an Auth user, run supabase/bootstrap-admin.sql.',
       admin_user_id;
+  else
+    insert into public.app_admins (user_id)
+    values (admin_user_id)
+    on conflict (user_id) do nothing;
   end if;
-
-  insert into public.app_admins (user_id)
-  values (admin_user_id)
-  on conflict (user_id) do nothing;
 end $$;
 
 -- ---------------------------------------------------------------------------

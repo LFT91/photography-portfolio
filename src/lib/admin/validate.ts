@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalogDraft, CuratorCollection } from "@/lib/admin/types";
 import { CURATOR_COLLECTION_META } from "@/lib/admin/shape";
+import { repoRoot } from "@/lib/admin/repo";
 
 export type CatalogIssue = {
   code: string;
@@ -13,7 +14,7 @@ export function validateCatalog(
   options?: { projectRoot?: string; skipFiles?: boolean },
 ): CatalogIssue[] {
   const issues: CatalogIssue[] = [];
-  const root = options?.projectRoot ?? process.cwd();
+  const root = options?.projectRoot ?? repoRoot();
   const known = new Set(draft.photos.map((photo) => photo.id));
   const seenPhoto = new Set<string>();
 

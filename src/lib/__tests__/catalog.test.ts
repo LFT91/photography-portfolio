@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { collections } from "../../content/collections";
-import { photos } from "../../content/photos";
+import { photos, type CatalogPhotoId } from "../../content/photos";
 import { getCollectionPhotos, getFatniCollectionSummaries, unassignedPhotoIds } from "../catalog";
 
 const ROOT = process.cwd();
@@ -146,14 +146,14 @@ describe("catalogue integrity", () => {
 
   it("preserves Fatni Nature titles and order", () => {
     assert.deepEqual(
-      collections.fatni.nature.map((id) => photos[id].title),
+      collections.fatni.nature.map((id) => photos[id as CatalogPhotoId].title),
       FATNI_NATURE_TITLES,
     );
   });
 
   it("preserves Ayoub After Dark titles and order", () => {
     assert.deepEqual(
-      collections.ayoub.afterDark.map((id) => photos[id].title),
+      collections.ayoub.afterDark.map((id) => photos[id as CatalogPhotoId].title),
       AYOUB_AFTER_DARK_TITLES,
     );
   });

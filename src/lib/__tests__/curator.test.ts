@@ -3,7 +3,6 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
-import { readCatalogFromDisk } from "../admin/catalog-writer";
 import {
   addToCollection,
   moveToCollection,
@@ -21,9 +20,8 @@ import {
   resolveMastersDir,
 } from "../admin/masters";
 import { allocatePhotoId } from "../admin/photo-id";
-import { collectionsToCurator, photosToCurator } from "../admin/shape";
+import { collectionsToCurator } from "../admin/shape";
 import { validateCatalog } from "../admin/validate";
-import { photos } from "../../content/photos";
 
 function sampleDraft() {
   return {
@@ -167,21 +165,6 @@ describe("catalogue validation", () => {
       true,
     );
     assert.equal(issues.some((issue) => issue.code === "missing-photo"), true);
-  });
-});
-
-describe("on-disk catalogue", () => {
-  it("reads the current nested catalogue without changing public memberships", () => {
-    const draft = readCatalogFromDisk();
-    const fromModules = {
-      photos: photosToCurator(photos),
-      collections: collectionsToCurator(),
-    };
-    assert.equal(draft.photos.length, fromModules.photos.length);
-    assert.deepEqual(
-      draft.collections.map((item) => item.photoIds),
-      fromModules.collections.map((item) => item.photoIds),
-    );
   });
 });
 

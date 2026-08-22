@@ -77,6 +77,72 @@ function posixRel(rel) {
   return rel.split(path.sep).join("/");
 }
 
+function isAbsoluteMasterRel(rel) {
+  return (
+    path.isAbsolute(rel) ||
+    rel.startsWith("/") ||
+    rel.startsWith("\\") ||
+    /^[a-zA-Z]:[\\/]/.test(rel)
+  );
+}
+
+/** Relative --file path only: no absolute paths, no `..` segments. */
+export function assertSafeMasterRel(rel) {
+  const trimmed = String(rel ?? "").trim();
+  if (!trimmed) {
+    throw new Error("Refusing empty --file path.");
+  }
+  if (trimmed.includes("\0")) {
+    throw new Error("Refusing --file path with a null byte.");
+  }
+  if (isAbsoluteMasterRel(trimmed)) {
+    throw new Error(`Refusing absolute --file path: ${trimmed}`);
+  }
+  const posix = posixRel(trimmed);
+  const rawSegments = posix.split(/[\\/]/);
+  if (rawSegments.includes("..")) {
+    throw new Error(`Refusing --file path traversal: ${trimmed}`);
+  }
+  const normalized = path.posix.normalize(posix);
+  const segments = normalized.split("/").filter((part) => part && part !== ".");
+  if (normalized.startsWith("/") || segments.includes("..")) {
+    throw new Error(`Refusing --file path traversal: ${trimmed}`);
+  }
+  return segments.join("/");
+}
+
+export function assertResolvedInside(candidate, parent, label) {
+  const parentResolved = existsSync(parent)
+    ? realpathSync(parent)
+    : path.resolve(parent);
+  const childResolved = existsSync(candidate)
+    ? realpathSync(candidate)
+    : path.resolve(candidate);
+  const prefix = parentResolved.endsWith(path.sep)
+    ? parentResolved
+    : `${parentResolved}${path.sep}`;
+  if (childResolved !== parentResolved && !childResolved.startsWith(prefix)) {
+    throw new Error(
+      `Refusing ${label} outside ${parentResolved}: ${childResolved}`,
+    );
+  }
+  return childResolved;
+}
+
+function generatedImageDestinations(rel) {
+  const keepRel = posixRel(outputRelFor(rel));
+  const dests = [
+    path.resolve(publicImages, keepRel),
+    path.resolve(publicImages, "small", keepRel),
+    path.resolve(publicImages, "tile", keepRel),
+    path.resolve(publicImages, "large", keepRel),
+  ];
+  if (posixRel(rel) === HERO_SOURCE) {
+    dests.push(path.resolve(publicImages, "hero", "startrails.jpg"));
+  }
+  return dests;
+}
+
 function outputRelFor(rel) {
   const ext = path.extname(rel);
   const jpegRel = rel.replace(/\.(png|webp|tif|tiff|jpeg)$/i, ".jpg");
@@ -345,16 +411,22 @@ function readManifest() {
 }
 
 async function generateOne(rel) {
+  const posix = assertSafeMasterRel(rel);
+
   const mastersDir = resolveMastersDir();
   const mastersStat = await stat(mastersDir);
   if (!mastersStat.isDirectory()) {
     throw new Error(`MASTERS_DIR is not a directory: ${mastersDir}`);
   }
 
-  const posix = posixRel(rel);
-  const src = path.join(mastersDir, posix);
+  const src = path.resolve(mastersDir, posix);
+  assertResolvedInside(src, mastersDir, "master");
   if (!existsSync(src)) {
     throw new Error(`Master not found: ${src}`);
+  }
+
+  for (const dest of generatedImageDestinations(posix)) {
+    assertResolvedInside(dest, publicImages, "generated image");
   }
 
   const { catalogKey, displayKey, entry } = await processFile(
@@ -458,7 +530,13 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+const isDirectRun =
+  Boolean(process.argv[1]) &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

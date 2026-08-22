@@ -29,7 +29,7 @@ export default function AboutPage() {
     <>
       {isAyoubSite() ? null : <JsonLd data={fatniPersonJsonLd()} />}
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
         <About />
       </main>
       <Footer />

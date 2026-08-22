@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
-import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
-import { SiteAdminBar } from "@/components/SiteAdminBar";
 import {
   FATNI_HOME_DESCRIPTION,
   FATNI_HOME_TITLE,
@@ -113,7 +111,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = isAyoubSite() ? ayoubMetadata : fatniMetadata;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"
@@ -121,11 +123,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full bg-ink font-brand text-paper">
         <div className="grain" aria-hidden />
-        <AdminProvider>
-          {children}
-          <SiteAdminBar />
-          <BackToTop />
-        </AdminProvider>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[80] focus:bg-ink focus:px-4 focus:py-2 focus:text-paper"
+        >
+          Skip to content
+        </a>
+        {children}
+        <BackToTop />
       </body>
     </html>
   );

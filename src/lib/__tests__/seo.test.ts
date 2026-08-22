@@ -46,9 +46,27 @@ describe("public sitemap", () => {
       "/contact",
     ]);
     assert.equal(
-      paths.some((path) => path.startsWith("/admin")),
+      paths.some((path) => path.includes("admin")),
       false,
     );
+  });
+
+  it("lists Ayoub public routes on the Ayoub site", () => {
+    const previous = process.env.NEXT_PUBLIC_SITE_ID;
+    process.env.NEXT_PUBLIC_SITE_ID = "ayoub-el-fatni";
+    try {
+      assert.deepEqual(publicSitemapPaths(), [
+        "/",
+        "/monochrome",
+        "/projects",
+        "/projects/after-dark",
+        "/about",
+        "/contact",
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_SITE_ID;
+      else process.env.NEXT_PUBLIC_SITE_ID = previous;
+    }
   });
 
   it("emits custom-domain URLs only", () => {

@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { ProtectedImage } from "@/components/ProtectedImage";
-import type { FatniCollectionSummary } from "@/lib/fatni-collections";
+import { PhotoImage } from "@/components/PhotoImage";
+import type { FatniCollectionSummary } from "@/lib/catalog";
 
 type CollectionIndexProps = {
   collections: FatniCollectionSummary[];
   heading?: string;
   intro?: string;
-  /** Tighter section for homepage preview under the hero. */
-  preview?: boolean;
 };
 
 /**
@@ -18,25 +16,16 @@ export function CollectionIndex({
   collections,
   heading = "Work",
   intro,
-  preview = false,
 }: CollectionIndexProps) {
   return (
     <section
-      className={`bg-ink px-5 sm:px-8 ${
-        preview ? "pb-20 pt-16 sm:pb-28 sm:pt-20" : "pb-20 pt-6 sm:pb-28 sm:pt-8"
-      }`}
+      className="bg-ink px-5 pb-20 pt-6 sm:px-8 sm:pb-28 sm:pt-8"
     >
       <div className="mx-auto max-w-7xl">
-        <div className={preview ? "mb-10 sm:mb-14" : "mb-12 sm:mb-16"}>
-          {preview ? (
-            <h2 className="font-display text-3xl italic text-paper sm:text-4xl">
-              {heading}
-            </h2>
-          ) : (
-            <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
-              {heading}
-            </h1>
-          )}
+        <div className="mb-12 sm:mb-16">
+          <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
+            {heading}
+          </h1>
           {intro ? (
             <p className="mt-3 max-w-xl font-brand text-base text-paper-dim sm:text-lg">
               {intro}
@@ -56,12 +45,13 @@ export function CollectionIndex({
                 >
                   <div className="relative aspect-[4/5] overflow-hidden bg-ink-soft">
                     {collection.cover ? (
-                      <ProtectedImage
+                      <PhotoImage
                         src={collection.cover.src}
                         alt={collection.cover.title}
+                        variant="tile"
                         fill
                         sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        priority={preview ? index < 3 : index < 3}
+                        priority={index < 3}
                         className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                       />
                     ) : (
@@ -88,17 +78,6 @@ export function CollectionIndex({
           </ul>
         )}
 
-        {preview ? (
-          <div className="mt-12 sm:mt-16">
-            <Link
-              href="/work"
-              className="inline-flex items-center gap-2 font-brand text-sm tracking-[0.12em] text-paper-dim transition-colors hover:text-paper"
-            >
-              All collections
-              <span aria-hidden>→</span>
-            </Link>
-          </div>
-        ) : null}
       </div>
     </section>
   );

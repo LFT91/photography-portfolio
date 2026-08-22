@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +8,7 @@ import { describe, it } from "node:test";
 import {
   assertResolvedInside,
   assertSafeMasterRel,
+  contentVersion,
 } from "../../../scripts/generate-images.mjs";
 
 const ROOT = process.cwd();
@@ -62,5 +64,22 @@ describe("generate-images --file path safety", () => {
     const nested = run("nature/../../secret.jpg");
     assert.notEqual(nested.status, 0);
     assert.match(`${nested.stderr}${nested.stdout}`, /traversal/);
+  });
+});
+
+describe("generated image content versions", () => {
+  it("is deterministic for identical bytes and changes when bytes change", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "fatni-hash-"));
+    const a = path.join(dir, "a.jpg");
+    const b = path.join(dir, "b.jpg");
+    writeFileSync(a, "same-bytes");
+    writeFileSync(b, "same-bytes");
+    assert.equal(contentVersion(a), contentVersion(b));
+    assert.equal(
+      contentVersion(a),
+      createHash("sha256").update("same-bytes").digest("hex").slice(0, 12),
+    );
+    writeFileSync(b, "other-bytes");
+    assert.notEqual(contentVersion(a), contentVersion(b));
   });
 });

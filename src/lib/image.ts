@@ -10,6 +10,7 @@ export type ImageVariant = {
   src: string;
   width?: number;
   height?: number;
+  version?: string;
 };
 
 export type ImageVariants = {
@@ -20,14 +21,21 @@ export type ImageVariants = {
   hero?: ImageVariant;
 };
 
+type ManifestVariant = {
+  src: string;
+  width: number;
+  height: number;
+  version?: string;
+};
+
 type ManifestEntry = {
   width: number;
   height: number;
-  small?: { src: string; width: number; height: number };
-  tile: { src: string; width: number; height: number };
-  large?: { src: string; width: number; height: number };
-  display: { src: string; width: number; height: number };
-  hero?: { src: string; width: number; height: number };
+  small?: ManifestVariant;
+  tile: ManifestVariant;
+  large?: ManifestVariant;
+  display: ManifestVariant;
+  hero?: ManifestVariant;
 };
 
 const IMAGE_MANIFEST = manifest as Record<string, ManifestEntry>;
@@ -36,6 +44,21 @@ export function localImagePath(src: string): string | null {
   if (!src) return null;
   if (src.startsWith("/images/")) return src.split("?")[0];
   return null;
+}
+
+export function versionedSrc(src: string, version?: string): string {
+  const path = src.split("?")[0];
+  if (!version) return path;
+  return `${path}?v=${version}`;
+}
+
+function renderVariant(variant: ManifestVariant | ImageVariant): ImageVariant {
+  return {
+    src: versionedSrc(variant.src, variant.version),
+    width: variant.width,
+    height: variant.height,
+    version: variant.version,
+  };
 }
 
 function manifestEntry(src: string): ManifestEntry | null {
@@ -52,11 +75,11 @@ export function variantsFor(src: string): ImageVariants {
   const entry = manifestEntry(src);
   if (entry) {
     return {
-      small: entry.small,
-      tile: entry.tile,
-      large: entry.large,
-      display: entry.display,
-      hero: entry.hero,
+      small: entry.small ? renderVariant(entry.small) : undefined,
+      tile: renderVariant(entry.tile),
+      large: entry.large ? renderVariant(entry.large) : undefined,
+      display: renderVariant(entry.display),
+      hero: entry.hero ? renderVariant(entry.hero) : undefined,
     };
   }
 
@@ -79,7 +102,7 @@ export function gridSrcSet(src: string): string | undefined {
 
 export function heroImage(): ImageVariant {
   const entry = IMAGE_MANIFEST["/images/after-dark/startrails.jpg"];
-  if (entry?.hero) return entry.hero;
+  if (entry?.hero) return renderVariant(entry.hero);
   return variantsFor("/images/after-dark/startrails.jpg").display;
 }
 

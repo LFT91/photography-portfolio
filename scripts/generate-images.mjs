@@ -34,6 +34,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -41,7 +42,7 @@ import sharp from "sharp";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicImages = path.join(root, "public", "images");
 const manifestPath = path.join(root, "src", "data", "image-manifest.json");
-const catalogPath = path.join(root, "src", "content", "photos.ts");
+const catalogPath = path.join(root, "src", "content", "photos.json");
 
 const SMALL_EDGE = 480;
 const TILE_EDGE = 800;
@@ -190,12 +191,41 @@ async function writeJpeg(pipeline, dest, quality, mastersDir) {
   await pipeline.jpeg(jpegOptions(quality)).toFile(dest);
 }
 
+export function contentVersion(filePath) {
+  const bytes = readFileSync(filePath);
+  return createHash("sha256").update(bytes).digest("hex").slice(0, 12);
+}
+
+function versionedVariant(src, width, height) {
+  const abs = path.join(root, "public", src.replace(/^\//, ""));
+  return {
+    src,
+    width,
+    height,
+    version: contentVersion(abs),
+  };
+}
+
 function catalogSrcs() {
   if (!existsSync(catalogPath)) {
     throw new Error(`Missing catalogue file: ${catalogPath}`);
   }
   const text = readFileSync(catalogPath, "utf8");
-  return [...text.matchAll(/src:\s*"(\/images\/[^"]+)"/g)].map((match) => match[1]);
+  let photos;
+  try {
+    photos = JSON.parse(text);
+  } catch {
+    throw new Error("Corrupt photos.json: not valid JSON.");
+  }
+  if (!photos || typeof photos !== "object" || Array.isArray(photos)) {
+    throw new Error("Corrupt photos.json: expected an object of photographs.");
+  }
+  return Object.values(photos).map((photo) => {
+    if (!photo || typeof photo !== "object" || typeof photo.src !== "string") {
+      throw new Error("Corrupt photos.json: each photograph needs a string src.");
+    }
+    return photo.src;
+  });
 }
 
 function expectedOutputs(masterRels) {
@@ -291,11 +321,11 @@ async function processFile(mastersDir, rel) {
       .jpeg(jpegOptions(HERO_QUALITY, "4:2:0"))
       .toFile(heroDest);
     const heroMeta = await sharp(heroDest).metadata();
-    hero = {
-      src: "/images/hero/startrails.jpg",
-      width: heroMeta.width ?? 0,
-      height: heroMeta.height ?? 0,
-    };
+    hero = versionedVariant(
+      "/images/hero/startrails.jpg",
+      heroMeta.width ?? 0,
+      heroMeta.height ?? 0,
+    );
   }
 
   const displayMeta = await sharp(displayDest).metadata();
@@ -311,26 +341,26 @@ async function processFile(mastersDir, rel) {
     entry: {
       width,
       height,
-      small: {
-        src: `/images/small/${posixRel(keepRel)}`,
-        width: smallMeta.width ?? 0,
-        height: smallMeta.height ?? 0,
-      },
-      tile: {
-        src: `/images/tile/${posixRel(keepRel)}`,
-        width: tileMeta.width ?? 0,
-        height: tileMeta.height ?? 0,
-      },
-      large: {
-        src: `/images/large/${posixRel(keepRel)}`,
-        width: largeMeta.width ?? 0,
-        height: largeMeta.height ?? 0,
-      },
-      display: {
-        src: displayKey,
-        width: displayMeta.width ?? 0,
-        height: displayMeta.height ?? 0,
-      },
+      small: versionedVariant(
+        `/images/small/${posixRel(keepRel)}`,
+        smallMeta.width ?? 0,
+        smallMeta.height ?? 0,
+      ),
+      tile: versionedVariant(
+        `/images/tile/${posixRel(keepRel)}`,
+        tileMeta.width ?? 0,
+        tileMeta.height ?? 0,
+      ),
+      large: versionedVariant(
+        `/images/large/${posixRel(keepRel)}`,
+        largeMeta.width ?? 0,
+        largeMeta.height ?? 0,
+      ),
+      display: versionedVariant(
+        displayKey,
+        displayMeta.width ?? 0,
+        displayMeta.height ?? 0,
+      ),
       ...(hero ? { hero } : {}),
     },
   };

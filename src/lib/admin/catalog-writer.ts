@@ -1,193 +1,261 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { CatalogDraft, CuratorPhoto } from "@/lib/admin/types";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname } from "node:path";
+import type { CatalogDraft } from "@/lib/admin/types";
 import {
   collectionsFromCurator,
   collectionsToCurator,
+  photosFromCurator,
   photosToCurator,
 } from "@/lib/admin/shape";
+import { catalogPaths, repoRoot } from "@/lib/admin/repo";
+import { validateCatalog } from "@/lib/admin/validate";
 
-const PHOTOS_PREFIX = `export type PhotoId = string;
+export type PhotosFile = Record<
+  string,
+  { title: string; src: string; displayScale?: number }
+>;
 
-export type PhotoRecord = {
-  title: string;
-  src: string;
-  displayScale?: number;
+export type CollectionsFile = {
+  fatni: Record<string, string[]>;
+  ayoub: Record<string, string[]>;
 };
 
-/** Canonical photograph records. One metadata object per photograph. */
-export const photos = `;
+const REQUIRED_FATNI = [
+  "nature",
+  "urban",
+  "astro",
+  "street",
+  "monochrome",
+] as const;
+const REQUIRED_AYOUB = ["afterDark", "monochrome"] as const;
 
-const PHOTOS_SUFFIX = ` as const satisfies Record<PhotoId, PhotoRecord>;
-
-export type CatalogPhotoId = keyof typeof photos;
-`;
-
-function indent(level: number): string {
-  return "  ".repeat(level);
-}
-
-function serializePhotoRecord(photo: CuratorPhoto, level: number): string {
-  const pad = indent(level);
-  const inner = indent(level + 1);
-  const lines = [
-    `${pad}${JSON.stringify(photo.id)}: {`,
-    `${inner}title: ${JSON.stringify(photo.title)},`,
-    `${inner}src: ${JSON.stringify(photo.src)},`,
-  ];
-  if (photo.displayScale != null && photo.displayScale !== 1) {
-    lines.push(`${inner}displayScale: ${photo.displayScale},`);
+function requiredIds(
+  groups: Record<string, string[]>,
+  key: string,
+  label: string,
+): string[] {
+  if (!Object.hasOwn(groups, key)) {
+    throw new Error(`Corrupt collections.json: missing ${label}.`);
   }
-  lines.push(`${pad}},`);
-  return lines.join("\n");
-}
-
-export function serializePhotosFile(photos: readonly CuratorPhoto[]): string {
-  const body = photos.map((photo) => serializePhotoRecord(photo, 1)).join("\n");
-  return `${PHOTOS_PREFIX}{\n${body}\n}${PHOTOS_SUFFIX}`;
-}
-
-function serializeIdArray(ids: readonly string[], level: number): string {
-  if (ids.length === 0) return "[] as const";
-  const inner = ids
-    .map((id) => `${indent(level + 1)}${JSON.stringify(id)},`)
-    .join("\n");
-  return `[\n${inner}\n${indent(level)}] as const`;
-}
-
-export function serializeCollectionsBlock(draft: CatalogDraft): string {
-  const nested = collectionsFromCurator(draft.collections);
-  const fatniKeys = ["nature", "urban", "astro", "street", "monochrome"];
-  const ayoubKeys = ["afterDark", "monochrome"];
-  const fatni = fatniKeys
-    .map(
-      (key) =>
-        `${indent(2)}${key}: ${serializeIdArray(nested.fatni[key] ?? [], 2)},`,
-    )
-    .join("\n");
-  const ayoub = ayoubKeys
-    .map(
-      (key) =>
-        `${indent(2)}${key}: ${serializeIdArray(nested.ayoub[key] ?? [], 2)},`,
-    )
-    .join("\n");
-  return `/** Ordered photograph IDs for each public collection. */
-export const collections = {
-  fatni: {
-${fatni}
-  },
-  ayoub: {
-${ayoub}
-  },
-} as const;`;
-}
-
-function atomicWrite(filePath: string, contents: string): void {
-  mkdirSync(dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  writeFileSync(tmp, contents, "utf8");
-  renameSync(tmp, filePath);
-}
-
-export function catalogPaths(projectRoot = process.cwd()) {
-  return {
-    photos: join(projectRoot, "src", "content", "photos.ts"),
-    collections: join(projectRoot, "src", "content", "collections.ts"),
-  };
-}
-
-function evalObjectLiteral<T>(source: string): T {
-  const stripped = source.replace(/\bas const\b/g, "");
-  return new Function(`"use strict"; return (${stripped});`)() as T;
-}
-
-function extractAssignedObject(source: string, name: string): string {
-  const marker = `export const ${name} = `;
-  const start = source.indexOf(marker);
-  if (start < 0) {
-    throw new Error(`Could not find ${name} export in catalogue file.`);
+  const value = groups[key];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== "string")) {
+    throw new Error(
+      `Corrupt collections.json: ${label} must be an array of strings.`,
+    );
   }
-  const brace = source.indexOf("{", start + marker.length);
-  if (brace < 0) {
-    throw new Error(`Could not parse ${name} object.`);
+  return value;
+}
+
+function parseJsonFile<T>(filePath: string, label: string): T {
+  if (!existsSync(filePath)) {
+    throw new Error(`Missing ${label}: ${filePath}`);
   }
-  let depth = 0;
-  for (let i = brace; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === "{") depth += 1;
-    else if (ch === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return source.slice(brace, i + 1);
+  let text: string;
+  try {
+    text = readFileSync(filePath, "utf8");
+  } catch {
+    throw new Error(`Could not read ${label}.`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Corrupt ${label}: not valid JSON.`);
+  }
+}
+
+function assertPhotosShape(value: unknown): PhotosFile {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Corrupt photos.json: expected an object of photographs.");
+  }
+  const photos = value as PhotosFile;
+  for (const [id, photo] of Object.entries(photos)) {
+    if (!photo || typeof photo !== "object" || Array.isArray(photo)) {
+      throw new Error(`Corrupt photos.json: photograph “${id}” is not an object.`);
+    }
+    if (typeof photo.title !== "string" || typeof photo.src !== "string") {
+      throw new Error(
+        `Corrupt photos.json: photograph “${id}” needs string title and src.`,
+      );
+    }
+    if (
+      photo.displayScale != null &&
+      (typeof photo.displayScale !== "number" || !Number.isFinite(photo.displayScale))
+    ) {
+      throw new Error(
+        `Corrupt photos.json: photograph “${id}” has an invalid displayScale.`,
+      );
+    }
+  }
+  return photos;
+}
+
+function assertCollectionsShape(value: unknown): CollectionsFile {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Corrupt collections.json: expected fatni/ayoub objects.");
+  }
+  const cols = value as CollectionsFile;
+  if (!cols.fatni || typeof cols.fatni !== "object" || Array.isArray(cols.fatni)) {
+    throw new Error("Corrupt collections.json: missing fatni collections.");
+  }
+  if (!cols.ayoub || typeof cols.ayoub !== "object" || Array.isArray(cols.ayoub)) {
+    throw new Error("Corrupt collections.json: missing ayoub collections.");
+  }
+  for (const key of REQUIRED_FATNI) {
+    requiredIds(cols.fatni, key, `fatni.${key}`);
+  }
+  for (const key of REQUIRED_AYOUB) {
+    requiredIds(cols.ayoub, key, `ayoub.${key}`);
+  }
+  for (const [site, groups] of [
+    ["fatni", cols.fatni],
+    ["ayoub", cols.ayoub],
+  ] as const) {
+    for (const [key, ids] of Object.entries(groups)) {
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) {
+        throw new Error(
+          `Corrupt collections.json: ${site}.${key} must be an array of strings.`,
+        );
       }
     }
   }
-  throw new Error(`Unclosed ${name} object.`);
+  return cols;
 }
 
-export function readCatalogFromDisk(
-  projectRoot = process.cwd(),
-): CatalogDraft {
+export function serializePhotosJson(draft: CatalogDraft): string {
+  return `${JSON.stringify(photosFromCurator(draft.photos), null, 2)}\n`;
+}
+
+export function serializeCollectionsJson(draft: CatalogDraft): string {
+  return `${JSON.stringify(collectionsFromCurator(draft.collections), null, 2)}\n`;
+}
+
+export function readCatalogFromDisk(projectRoot = repoRoot()): CatalogDraft {
   const paths = catalogPaths(projectRoot);
-  const photosSource = readFileSync(
-    /* turbopackIgnore: true */ paths.photos,
-    "utf8",
+  const photos = assertPhotosShape(
+    parseJsonFile<unknown>(paths.photos, "photos.json"),
   );
-  const collectionsSource = readFileSync(
-    /* turbopackIgnore: true */ paths.collections,
-    "utf8",
+  const nested = assertCollectionsShape(
+    parseJsonFile<unknown>(paths.collections, "collections.json"),
   );
-  const photosRecord = evalObjectLiteral<
-    Record<string, { title: string; src: string; displayScale?: number }>
-  >(extractAssignedObject(photosSource, "photos"));
-  const nested = evalObjectLiteral<{
-    fatni: Record<string, string[]>;
-    ayoub: Record<string, string[]>;
-  }>(extractAssignedObject(collectionsSource, "collections"));
   return {
-    photos: photosToCurator(photosRecord),
+    photos: photosToCurator(photos),
     collections: collectionsToCurator({
       fatni: {
-        nature: nested.fatni.nature ?? [],
-        urban: nested.fatni.urban ?? [],
-        astro: nested.fatni.astro ?? [],
-        street: nested.fatni.street ?? [],
-        monochrome: nested.fatni.monochrome ?? [],
+        nature: requiredIds(nested.fatni, "nature", "fatni.nature"),
+        urban: requiredIds(nested.fatni, "urban", "fatni.urban"),
+        astro: requiredIds(nested.fatni, "astro", "fatni.astro"),
+        street: requiredIds(nested.fatni, "street", "fatni.street"),
+        monochrome: requiredIds(nested.fatni, "monochrome", "fatni.monochrome"),
       },
       ayoub: {
-        afterDark: nested.ayoub.afterDark ?? [],
-        monochrome: nested.ayoub.monochrome ?? [],
+        afterDark: requiredIds(nested.ayoub, "afterDark", "ayoub.afterDark"),
+        monochrome: requiredIds(nested.ayoub, "monochrome", "ayoub.monochrome"),
       },
     }),
   };
 }
 
-function replaceCollectionsBlock(source: string, block: string): string {
-  const startMarker = "/** Ordered photograph IDs for each public collection. */";
-  const start = source.indexOf(startMarker);
-  if (start < 0) {
-    throw new Error("Could not find collections block in collections.ts.");
+function writeTemp(filePath: string, contents: string): string {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.tmp`;
+  writeFileSync(tmp, contents, "utf8");
+  return tmp;
+}
+
+function restoreFromBackup(filePath: string, backupPath: string | null) {
+  if (backupPath && existsSync(backupPath)) {
+    copyFileSync(backupPath, filePath);
+    return;
   }
-  const end = source.indexOf("\n} as const;", start);
-  if (end < 0) {
-    throw new Error("Could not find end of collections block.");
+  if (existsSync(filePath)) rmSync(filePath, { force: true });
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return statSync(filePath).isFile();
+  } catch {
+    return false;
   }
-  const after = source.slice(end + "\n} as const;".length);
-  return `${source.slice(0, start)}${block}${after}`;
 }
 
 export function writeCatalogFiles(
   draft: CatalogDraft,
-  projectRoot = process.cwd(),
+  projectRoot = repoRoot(),
+  options?: { skipFiles?: boolean },
 ): void {
+  const issues = validateCatalog(draft, {
+    projectRoot,
+    skipFiles: options?.skipFiles,
+  });
+  if (issues.length) {
+    throw new Error(
+      `Refusing to write an invalid catalogue: ${issues.map((issue) => issue.message).join(" ")}`,
+    );
+  }
+
   const paths = catalogPaths(projectRoot);
-  atomicWrite(paths.photos, serializePhotosFile(draft.photos));
-  const current = readFileSync(
-    /* turbopackIgnore: true */ paths.collections,
-    "utf8",
-  );
-  atomicWrite(
-    paths.collections,
-    replaceCollectionsBlock(current, serializeCollectionsBlock(draft)),
-  );
+  const photosText = serializePhotosJson(draft);
+  const collectionsText = serializeCollectionsJson(draft);
+
+  let photosParsed: unknown;
+  let collectionsParsed: unknown;
+  try {
+    photosParsed = JSON.parse(photosText);
+    collectionsParsed = JSON.parse(collectionsText);
+  } catch {
+    throw new Error("Refusing to write catalogue: serializer produced invalid JSON.");
+  }
+  assertPhotosShape(photosParsed);
+  assertCollectionsShape(collectionsParsed);
+
+  const photosTmp = writeTemp(paths.photos, photosText);
+  const collectionsTmp = writeTemp(paths.collections, collectionsText);
+
+  try {
+    assertPhotosShape(parseJsonFile<unknown>(photosTmp, "photos.json.tmp"));
+    assertCollectionsShape(
+      parseJsonFile<unknown>(collectionsTmp, "collections.json.tmp"),
+    );
+  } catch (error) {
+    rmSync(photosTmp, { force: true });
+    rmSync(collectionsTmp, { force: true });
+    throw error;
+  }
+
+  const photosBak = isFile(paths.photos) ? `${paths.photos}.bak` : null;
+  const collectionsBak = isFile(paths.collections)
+    ? `${paths.collections}.bak`
+    : null;
+
+  try {
+    if (photosBak) copyFileSync(paths.photos, photosBak);
+    if (collectionsBak) copyFileSync(paths.collections, collectionsBak);
+    renameSync(photosTmp, paths.photos);
+    try {
+      renameSync(collectionsTmp, paths.collections);
+    } catch (error) {
+      restoreFromBackup(paths.photos, photosBak);
+      throw error;
+    }
+  } catch (error) {
+    restoreFromBackup(paths.photos, photosBak);
+    restoreFromBackup(paths.collections, collectionsBak);
+    rmSync(photosTmp, { force: true });
+    rmSync(collectionsTmp, { force: true });
+    throw error;
+  } finally {
+    if (photosBak) rmSync(photosBak, { force: true });
+    if (collectionsBak) rmSync(collectionsBak, { force: true });
+  }
 }
+
+export { catalogPaths, repoRoot };

@@ -24,8 +24,9 @@ site config
 
 There is no production database, no SQL, no Supabase, and no admin CMS.
 
-- Catalogue: `src/content/photos.ts`, `src/content/collections.ts`, `src/content/sites.ts`
-- Images: `public/images/` (small 480 / tile 800 / large 1200 / lightbox 1800 / dedicated hero 1600)
+- Catalogue: `src/content/photos.json`, `src/content/collections.json` (thin TypeScript wrappers in `src/content/*.ts`), `src/content/sites.ts`
+- Images: `public/images/` (small 480 / tile 800 / large 1200 / lightbox 1800 / dedicated hero 1600), requested with a content-hash `?v=` query
+- Local curator: `tools/curator/` (not part of the public Vercel app)
 - Camera originals stay **outside Git**
 
 ## Local
@@ -44,9 +45,9 @@ Local curation (not available in production):
 npm run curate
 ```
 
-That starts the development server on `127.0.0.1` and enables `/admin`. Ordinary `npm run dev` and production builds do not. Save writes `src/content/photos.ts` and `src/content/collections.ts` only — it never pushes to GitHub.
+That starts a **separate** localhost Next app from `tools/curator/` on `127.0.0.1:3000` and opens `/admin`. Ordinary `npm run dev` and production builds do not include curator routes. Save writes `src/content/photos.json` and `src/content/collections.json` only — it never pushes to GitHub. Double-click `Photography Curator.command` to do the same from Finder; `Stop Photography Curator.command` stops only that local curator.
 
-Add Photograph needs `MASTERS_DIR` in `.env.local` pointing at an existing folder **outside Git**. Originals are copied there; web derivatives use the same generator as `npm run images`.
+Add Photograph copies the original to `~/Pictures/Fatni Photography Masters` (outside Git) and generates the same web derivatives as `npm run images`. `MASTERS_DIR` is an optional override.
 
 ```bash
 npm run lint
@@ -55,10 +56,18 @@ npm test
 npm run build
 ```
 
+## Daily use
+
+1. Double-click `Photography Curator.command`
+2. Curate visually in the browser
+3. Save
+4. Ready to publish
+5. Commit/push when ready
+
 ## Photography workflow
 
 1. Add the camera original to the durable off-repo master archive. Never overwrite a master in place.
-2. Add or update the photograph in `src/content/photos.ts` and place its ID in the correct ordered array in `src/content/collections.ts`.
+2. Add or update the photograph in `src/content/photos.json` and place its ID in the correct ordered array in `src/content/collections.json`.
 3. `MASTERS_DIR=/path/to/masters/images npm run images`
 4. Review locally (`npm run dev`).
 5. Commit and push. CI runs lint, typecheck, tests, and both site builds. Vercel deploys.

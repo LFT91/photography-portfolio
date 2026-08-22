@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { ArtistStagePrint } from "@/components/ArtistStagePrint";
 import { ProtectedImage } from "@/components/ProtectedImage";
-import { heroImage, type Photo } from "@/data/photos";
+import type { Photo } from "@/data/photos";
+import { heroPhotograph } from "@/lib/catalog";
 import { isAyoubSite } from "@/lib/site";
 
 function FatniHero() {
+  const hero = heroPhotograph();
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden">
       <div className="absolute inset-0 animate-hero-image">
         <ProtectedImage
-          src={heroImage.src}
-          alt={heroImage.title}
+          src={hero.src}
+          alt={hero.title}
           fill
           priority
           sizes="100vw"

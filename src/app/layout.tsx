@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Instrument_Serif } from "next/font/google";
-import { AdminProvider } from "@/components/AdminProvider";
 import { BackToTop } from "@/components/BackToTop";
-import { SiteAdminBar } from "@/components/SiteAdminBar";
 import {
   FATNI_HOME_DESCRIPTION,
   FATNI_HOME_TITLE,
@@ -121,11 +119,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full bg-ink font-brand text-paper">
         <div className="grain" aria-hidden />
-        <AdminProvider>
-          {children}
-          <SiteAdminBar />
-          <BackToTop />
-        </AdminProvider>
+        {children}
+        <BackToTop />
       </body>
     </html>
   );

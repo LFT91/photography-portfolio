@@ -15,8 +15,6 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/work",
 });
 
-export const dynamic = "force-dynamic";
-
 export default async function WorkPage() {
   if (isAyoubSite()) {
     // Selected Work was retired; send admins/bookmarks to the live project.

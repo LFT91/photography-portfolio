@@ -2,12 +2,8 @@ import type { PhotoCategory } from "@/data/photos";
 
 /**
  * Fatni public archive collections.
- * Photographs come from Supabase membership/order; this config drives
+ * Membership and order live in src/content/collections.ts; this config drives
  * public hrefs. After Dark is Ayoub-only (not a Fatni collection).
- *
- * Adding a future collection: seed a collections row (site_id + slug + title),
- * extend PhotoCategory if needed, and append a def here (or rely on DB
- * slug → /work/[slug] once title is a known category).
  */
 export type FatniCollectionDef = {
   slug: string;

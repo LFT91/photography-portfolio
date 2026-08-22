@@ -13,8 +13,6 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/projects/after-dark",
 });
 
-export const dynamic = "force-dynamic";
-
 export default async function AyoubAfterDarkPage() {
   if (!isAyoubSite()) notFound();
 

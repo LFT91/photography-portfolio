@@ -4,12 +4,16 @@ import { CollectionAdjacentNav } from "@/components/CollectionAdjacentNav";
 import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
-import { fatniDefBySlug } from "@/lib/fatni-collections";
+import { fatniDefBySlug, FATNI_PUBLIC_COLLECTIONS } from "@/lib/fatni-collections";
 import { getCollectionPhotos } from "@/lib/photos";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
+export function generateStaticParams() {
+  return FATNI_PUBLIC_COLLECTIONS.filter((collection) => !collection.special).map(
+    (collection) => ({ slug: collection.slug }),
+  );
+}
 
 type PageProps = {
   params: Promise<{ slug: string }>;

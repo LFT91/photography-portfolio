@@ -6,8 +6,6 @@ import type { Photo } from "@/data/photos";
 import { fatniHomeJsonLd, FATNI_HOME_DESCRIPTION, FATNI_HOME_TITLE, publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = isAyoubSite()
   ? { alternates: { canonical: "/" } }
   : publicPageMetadata({
@@ -17,8 +15,9 @@ export const metadata: Metadata = isAyoubSite()
       absoluteTitle: FATNI_HOME_TITLE,
     });
 
-/** Approved Ayoub homepage façade (local asset; not from Supabase membership). */
+/** Approved Ayoub homepage façade (local asset; not from collection membership). */
 const AYOUB_HOMEPAGE_COVER: Photo = {
+  id: "ayoub-homepage-facade",
   src: "/images/ayoub-homepage-test.png",
   title: "Façade",
   categories: ["After Dark"],

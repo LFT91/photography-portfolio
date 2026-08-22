@@ -1,6 +1,8 @@
 # Fatni Photography
 
-Next.js portfolio for **Fatni Photography** (Ayoub El Fatni) — travel, street, and After Dark.
+Next.js portfolio for **Fatni Photography** and **Ayoub El Fatni**.
+
+Public production is static: catalogue files plus generated images, deployed on Vercel.
 
 ## Local
 
@@ -9,38 +11,30 @@ npm install
 npm run dev
 ```
 
-Site uses the local catalog in `src/data/photos.ts` until Supabase has photos.
+Open `http://localhost:3000`. The local curator is at `/admin` in development only.
 
-## Supabase (admin upload / remove / reorder)
+## Catalogue
 
-1. Create a free project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `supabase/migrations/20260806000000_photos.sql`.
-3. **Authentication → Users** → add yourself (email + password).
-4. Copy Project URL + anon key from **Settings → API**.
-5. Copy `.env.example` to `.env.local` and fill:
+Canonical source of truth:
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
+- `src/content/photos.ts`
+- `src/content/collections.ts`
+- `src/content/sites.ts`
+- `src/data/image-manifest.json`
 
-6. Restart `npm run dev`, open `/admin`, sign in, upload photos.
+The curator writes these files in the working tree. Commit and deploy when you want the public sites to update. It never pushes to GitHub on its own.
 
-Public gallery reads Supabase when the `photos` table has rows; otherwise it falls back to the local catalog.
+## Add Photograph
 
-## Vercel
+Set `MASTERS_DIR` in `.env.local` to an existing folder **outside** Git. New originals are copied there; web derivatives (480 / 800 / 1200 / 1800) are generated into `public/images/generated/`.
 
-```bash
-npx vercel login
-npx vercel --prod
-```
+If `MASTERS_DIR` is missing, Add Photograph stays disabled.
 
-Add the same env vars in **Vercel → Project → Settings → Environment Variables**, then redeploy.
+## Production
 
-### Custom domain
+Two Vercel projects, same repo:
 
-1. Buy a domain (e.g. `fatni.photography` or `fatniphotography.com`).
-2. In Vercel → **Settings → Domains** → add it.
-3. Follow Vercel’s DNS instructions at your registrar.
+- Fatni: `NEXT_PUBLIC_SITE_ID=fatni-photography`
+- Ayoub: `NEXT_PUBLIC_SITE_ID=ayoub-el-fatni`
 
-Admin stays at `https://your-domain.com/admin` (bookmark only — not linked on public pages).
+`/admin` is unavailable in production builds.

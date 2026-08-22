@@ -1,31 +1,9 @@
 "use client";
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
-import {
-  applyDraftToList,
-  useAdmin,
-} from "@/components/AdminProvider";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ProtectedImage } from "@/components/ProtectedImage";
-import {
-  categories,
-  photos,
-  photoInCategory,
-  type Photo,
-  type PhotoCategory,
-} from "@/data/photos";
-import {
-  applyExactSwaps,
-  indicesForKeys,
-  resolveMultiSwapDest,
-} from "@/lib/gallery-reorder";
-import { photoOrderInCategory } from "@/lib/photo-map";
+import { photoInCategory, type Photo, type PhotoCategory } from "@/data/photos";
+import { photoOrderInCategory } from "@/lib/catalog";
 
 function Lightbox({
   items,
@@ -38,7 +16,6 @@ function Lightbox({
   index: number;
   onClose: () => void;
   onChange: (index: number) => void;
-  /** Ayoub: quieter chrome; still prev/next + keys. */
   discreet?: boolean;
 }) {
   const photo = items[index];
@@ -150,9 +127,7 @@ function Lightbox({
           <div
             key={photo.src}
             className={`lightbox-frame relative mx-auto w-full ${
-              discreet
-                ? "h-[74svh] sm:h-[80svh]"
-                : "h-[68svh] sm:h-[72svh]"
+              discreet ? "h-[74svh] sm:h-[80svh]" : "h-[68svh] sm:h-[72svh]"
             }`}
           >
             <ProtectedImage
@@ -181,28 +156,10 @@ function Lightbox({
           )}
         </div>
       </div>
-
-      {total > 1 ? (
-        <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden>
-          <ProtectedImage
-            src={items[(index + 1) % total].src}
-            alt=""
-            width={16}
-            height={16}
-          />
-          <ProtectedImage
-            src={items[(index - 1 + total) % total].src}
-            alt=""
-            width={16}
-            height={16}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
 
-/** 100% = one grid column; up to 300% spans up to three columns. */
 const SCALE_MIN = 0.45;
 const SCALE_LAYOUT_MAX = 3;
 
@@ -210,7 +167,6 @@ function clampScale(n: number, max = SCALE_LAYOUT_MAX) {
   return Math.round(Math.min(max, Math.max(SCALE_MIN, n)) * 100) / 100;
 }
 
-/** How many grid columns a scale should occupy. */
 function spanForScale(scale: number, cols: number) {
   if (cols <= 1 || scale <= 1) return 1;
   if (scale <= 2) return Math.min(2, cols);
@@ -223,12 +179,10 @@ function widthPctForScale(scale: number, span: number) {
 
 function useGalleryLayout(mode: "fatni" | "ayoub" = "fatni") {
   const [cols, setCols] = useState<1 | 2 | 3>(mode === "ayoub" ? 2 : 3);
-  const [baseCellWidth, setBaseCellWidth] = useState(320);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateCols = () => {
-      // Fatni archive: 1 → 2 (md) → 3 (lg). Ayoub: 1 → 2 from md.
       if (mode === "ayoub") {
         setCols(window.matchMedia("(min-width: 768px)").matches ? 2 : 1);
         return;
@@ -246,607 +200,62 @@ function useGalleryLayout(mode: "fatni" | "ayoub" = "fatni") {
     return () => window.removeEventListener("resize", updateCols);
   }, [mode]);
 
-  useEffect(() => {
-    const el = galleryRef.current;
-    if (!el) return;
-    const measure = () => {
-      const styles = getComputedStyle(el);
-      const gap = parseFloat(styles.columnGap || styles.gap || "16") || 16;
-      const w = el.clientWidth;
-      setBaseCellWidth(Math.max(1, (w - gap * (cols - 1)) / cols));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [cols]);
-
-  return { cols, baseCellWidth, galleryRef };
-}
-
-/** Scroll the page while dragging near the top/bottom edge. */
-function useDragAutoScroll(enabled: boolean) {
-  useEffect(() => {
-    if (!enabled) return;
-
-    const edge = 72;
-    const maxStep = 28;
-    let frame = 0;
-    let velocity = 0;
-
-    const tick = () => {
-      if (velocity !== 0) {
-        window.scrollBy(0, velocity);
-      }
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-
-    const onDragOver = (e: DragEvent) => {
-      // Required so drops keep working while scrolling.
-      e.preventDefault();
-      const y = e.clientY;
-      const h = window.innerHeight;
-      if (y < edge) {
-        velocity = -maxStep * (1 - y / edge);
-      } else if (y > h - edge) {
-        velocity = maxStep * (1 - (h - y) / edge);
-      } else {
-        velocity = 0;
-      }
-    };
-
-    const stop = () => {
-      velocity = 0;
-      document.body.classList.remove("is-gallery-dragging");
-    };
-
-    const onDragStart = () => {
-      document.body.classList.add("is-gallery-dragging");
-    };
-
-    window.addEventListener("dragstart", onDragStart, true);
-    window.addEventListener("dragover", onDragOver, true);
-    window.addEventListener("dragend", stop, true);
-    window.addEventListener("drop", stop, true);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      stop();
-      window.removeEventListener("dragstart", onDragStart, true);
-      window.removeEventListener("dragover", onDragOver, true);
-      window.removeEventListener("dragend", stop, true);
-      window.removeEventListener("drop", stop, true);
-    };
-  }, [enabled]);
-}
-
-type ResizeEdge =
-  | "left"
-  | "right"
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
-
-function resizeDelta(edge: ResizeEdge, dx: number, dy: number, colW: number) {
-  switch (edge) {
-    case "left":
-      return -dx / colW;
-    case "right":
-      return dx / colW;
-    case "top-left":
-      return (-dx - dy) / 2 / colW;
-    case "top-right":
-      return (dx - dy) / 2 / colW;
-    case "bottom-left":
-      return (-dx + dy) / 2 / colW;
-    case "bottom-right":
-      return (dx + dy) / 2 / colW;
-  }
-}
-
-function ResizeHandle({
-  edge,
-  cursor,
-  className,
-  label,
-  scalePct,
-  scalePctMax,
-  onResize,
-}: {
-  edge: ResizeEdge;
-  cursor: string;
-  className: string;
-  label: string;
-  scalePct: number;
-  scalePctMax: number;
-  onResize: (edge: ResizeEdge, e: ReactPointerEvent) => void;
-}) {
-  return (
-    <div
-      role="slider"
-      aria-label={label}
-      aria-valuemin={45}
-      aria-valuemax={scalePctMax}
-      aria-valuenow={scalePct}
-      tabIndex={0}
-      onPointerDown={(e) => onResize(edge, e)}
-      className={`absolute z-20 touch-none ${cursor} ${className}`}
-    />
-  );
-}
-
-function GalleryUploadZone({
-  room,
-  onError,
-}: {
-  room: PhotoCategory;
-  onError: (msg: string | null) => void;
-}) {
-  const { queueUpload, saving } = useAdmin();
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const addFiles = (list: FileList | null) => {
-    if (!list?.length) return;
-    onError(null);
-    for (const file of Array.from(list)) {
-      const err = queueUpload(file, [room]);
-      if (err) {
-        onError(err);
-        break;
-      }
-    }
-    if (inputRef.current) inputRef.current.value = "";
-  };
-
-  return (
-    <div className="mb-8">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="sr-only"
-        onChange={(e) => addFiles(e.target.files)}
-      />
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => inputRef.current?.click()}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          addFiles(e.dataTransfer.files);
-        }}
-        className={`flex w-full flex-col items-center justify-center gap-2 border border-dashed px-4 py-10 text-center transition-colors disabled:opacity-50 ${
-          dragOver
-            ? "border-ember bg-ember/10 text-ember"
-            : "border-line text-paper-dim hover:border-fog hover:text-paper"
-        }`}
-      >
-        <span className="font-brand text-sm tracking-[0.06em]">
-          Drop photos here, or click to add to {room}
-        </span>
-        <span className="font-brand text-xs text-fog">
-          Staged until you Save below
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function photoKey(photo: Photo) {
-  return photo.id || photo.src;
+  return { cols, galleryRef };
 }
 
 function GalleryCard({
   photo,
   index,
-  total,
   onOpen,
-  editing,
-  busy,
-  baseCellWidth,
   cols,
-  selected,
-  selectedKeys,
-  onSelect,
-  onSelectRow,
-  onMove,
-  onRemove,
-  onScale,
-  onTitle,
-  onDropAt,
   uniformColumn = false,
 }: {
   photo: Photo;
   index: number;
-  total: number;
   onOpen: (photo: Photo) => void;
-  editing: boolean;
-  busy: boolean;
-  baseCellWidth: number;
   cols: number;
-  selected: boolean;
-  selectedKeys: readonly string[];
-  onSelect: (
-    key: string,
-    mods: { toggle: boolean; range: boolean },
-  ) => void;
-  onSelectRow: (index: number) => void;
-  onMove: (from: number, dir: "up" | "down" | "left" | "right") => void;
-  onRemove: (photo: Photo) => void;
-  onScale: (photo: Photo, next: number) => void;
-  onTitle: (photo: Photo, title: string) => void;
-  onDropAt: (fromKeys: string[], toKey: string) => void;
-  /** Ayoub: one column only — ignore displayScale spans. */
   uniformColumn?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const imgWrapRef = useRef<HTMLDivElement>(null);
-  const [soft, setSoft] = useState(false);
   const savedScale = clampScale(photo.displayScale ?? 1);
-  const [liveScale, setLiveScale] = useState(savedScale);
-  const liveScaleRef = useRef(savedScale);
-  const resizingRef = useRef(false);
-  const openClickTimer = useRef<number | null>(null);
-  const suppressOpenRef = useRef(false);
-  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
-  const replaceInputRef = useRef<HTMLInputElement>(null);
-  const { queueReplace, draft } = useAdmin();
-  const pending = Boolean(photo.id?.startsWith("pending:"));
-  const replaced = Boolean(photo.id && draft.replaces[photo.id]);
-
-  const clearOpenTimer = () => {
-    if (openClickTimer.current) {
-      window.clearTimeout(openClickTimer.current);
-      openClickTimer.current = null;
-    }
-  };
-
-  const markInteraction = () => {
-    suppressOpenRef.current = true;
-    clearOpenTimer();
-  };
-
-  useEffect(() => {
-    if (resizingRef.current) return;
-    setLiveScale(savedScale);
-    liveScaleRef.current = savedScale;
-  }, [savedScale]);
+  const layoutScale = uniformColumn ? 1 : Math.min(savedScale, Math.min(SCALE_LAYOUT_MAX, cols));
+  const span = uniformColumn ? 1 : spanForScale(layoutScale, cols);
+  const imageWidthPct = uniformColumn ? 100 : widthPctForScale(layoutScale, span);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.classList.remove("is-visible");
 
-    // Reveal above-the-fold tiles before paint so category switches
-    // and first load aren't a blank dark frame.
     const rect = el.getBoundingClientRect();
     if (rect.top < window.innerHeight && rect.bottom > 0) {
       el.classList.add("is-visible");
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add("is-visible");
-          observer.unobserve(el);
-        }
-      },
-      { threshold: 0.08, rootMargin: "40px 0px" },
-    );
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        el.classList.add("is-visible");
+        observer.unobserve(el);
+      }
+    });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [photo.src]);
-
-  useEffect(() => {
-    const wrap = imgWrapRef.current;
-    if (!wrap) return;
-    const img = wrap.querySelector("img");
-    if (!img) return;
-
-    const check = () => {
-      const natural = img.naturalWidth;
-      const shown = img.clientWidth * (window.devicePixelRatio || 1);
-      // Advisory only — never blocks enlarge.
-      setSoft(natural > 0 && shown > natural * 1.08);
-    };
-
-    if (img.complete) check();
-    else img.addEventListener("load", check);
-    window.addEventListener("resize", check);
-    return () => {
-      img.removeEventListener("load", check);
-      window.removeEventListener("resize", check);
-    };
-  }, [photo.src, liveScale]);
-
-  const startResize = (edge: ResizeEdge, e: ReactPointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (busy || baseCellWidth <= 0) return;
-
-    markInteraction();
-    resizingRef.current = true;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startScale = liveScaleRef.current;
-    const scaleMax = Math.min(SCALE_LAYOUT_MAX, cols);
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
-
-    const onPtrMove = (ev: PointerEvent) => {
-      markInteraction();
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      const next = clampScale(
-        startScale + resizeDelta(edge, dx, dy, baseCellWidth),
-        scaleMax,
-      );
-      liveScaleRef.current = next;
-      setLiveScale(next);
-    };
-
-    const onUp = (ev: PointerEvent) => {
-      target.releasePointerCapture(ev.pointerId);
-      target.removeEventListener("pointermove", onPtrMove);
-      target.removeEventListener("pointerup", onUp);
-      target.removeEventListener("pointercancel", onUp);
-      resizingRef.current = false;
-      // Keep suppress through the synthetic click that follows pointerup.
-      markInteraction();
-      window.setTimeout(() => {
-        suppressOpenRef.current = false;
-      }, 0);
-      const next = liveScaleRef.current;
-      if (Math.abs(next - savedScale) >= 0.01) onScale(photo, next);
-    };
-
-    target.addEventListener("pointermove", onPtrMove);
-    target.addEventListener("pointerup", onUp);
-    target.addEventListener("pointercancel", onUp);
-  };
-
-  const scaleMax = Math.min(SCALE_LAYOUT_MAX, cols);
-  const layoutScale = uniformColumn ? 1 : Math.min(liveScale, scaleMax);
-  const span = uniformColumn ? 1 : spanForScale(layoutScale, cols);
-  const imageWidthPct = uniformColumn ? 100 : widthPctForScale(layoutScale, span);
-  const scalePct = Math.round(liveScale * 100);
-  const scalePctMax = Math.round(scaleMax * 100);
-  const col = index % cols;
-  const row = Math.floor(index / cols);
-  const canLeft = col > 0;
-  const canRight = col < cols - 1 && index + 1 < total;
-  const canUp = row > 0;
-  const canDown = index + cols < total;
+  }, [photo.id, photo.src]);
 
   return (
     <div
       ref={ref}
-      className={`gallery-item group relative w-full min-w-0 ${
-        editing ? "is-editing" : ""
-      } ${selected ? "is-selected" : ""} ${pending ? "opacity-90" : ""}`}
+      className="gallery-item group relative w-full min-w-0"
       style={{
         transitionDelay: `${(index % 6) * 25}ms`,
         gridColumn: `span ${span} / span ${span}`,
       }}
-      onDragOver={
-        editing
-          ? (e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
-              e.currentTarget.classList.add("ring-1", "ring-ember/70");
-            }
-          : undefined
-      }
-      onDragLeave={
-        editing
-          ? (e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                e.currentTarget.classList.remove("ring-1", "ring-ember/70");
-              }
-            }
-          : undefined
-      }
-      onDrop={
-        editing
-          ? (e) => {
-              e.preventDefault();
-              e.currentTarget.classList.remove("ring-1", "ring-ember/70");
-              const raw = e.dataTransfer.getData("text/photo-keys");
-              let fromKeys: string[] = [];
-              if (raw) {
-                try {
-                  const parsed = JSON.parse(raw) as unknown;
-                  if (Array.isArray(parsed)) {
-                    fromKeys = parsed.filter(
-                      (k): k is string => typeof k === "string",
-                    );
-                  }
-                } catch {
-                  fromKeys = [];
-                }
-              }
-              if (fromKeys.length === 0) {
-                const single = e.dataTransfer.getData("text/photo-key");
-                if (single) fromKeys = [single];
-              }
-              const toKey = photoKey(photo);
-              if (fromKeys.length) onDropAt(fromKeys, toKey);
-            }
-          : undefined
-      }
     >
       <div className="w-full">
         <div
-          ref={imgWrapRef}
-          className={`relative mx-auto ${
-            uniformColumn ? "bg-ink" : "bg-ink-soft"
-          } ${editing && !busy ? "cursor-grab active:cursor-grabbing" : ""}`}
+          className={`relative mx-auto ${uniformColumn ? "bg-ink" : "bg-ink-soft"}`}
           style={{ width: `${imageWidthPct}%` }}
-          draggable={editing && !busy}
-          onPointerDown={
-            editing
-              ? (e) => {
-                  if (e.button !== 0) return;
-                  pointerDownRef.current = { x: e.clientX, y: e.clientY };
-                  suppressOpenRef.current = false;
-                }
-              : undefined
-          }
-          onPointerMove={
-            editing
-              ? (e) => {
-                  const start = pointerDownRef.current;
-                  if (!start || suppressOpenRef.current) return;
-                  const dx = e.clientX - start.x;
-                  const dy = e.clientY - start.y;
-                  if (dx * dx + dy * dy > 25) markInteraction();
-                }
-              : undefined
-          }
-          onPointerUp={
-            editing
-              ? () => {
-                  pointerDownRef.current = null;
-                }
-              : undefined
-          }
-          onPointerCancel={
-            editing
-              ? () => {
-                  pointerDownRef.current = null;
-                  markInteraction();
-                }
-              : undefined
-          }
-          onDragStart={
-            editing
-              ? (e) => {
-                  if (resizingRef.current) {
-                    e.preventDefault();
-                    return;
-                  }
-                  markInteraction();
-                  const key = photoKey(photo);
-                  const keys = selectedKeys.includes(key)
-                    ? [...selectedKeys]
-                    : [key];
-                  e.dataTransfer.setData("text/photo-key", key);
-                  e.dataTransfer.setData(
-                    "text/photo-keys",
-                    JSON.stringify(keys),
-                  );
-                  e.dataTransfer.effectAllowed = "move";
-                  const card = ref.current;
-                  card?.classList.add("is-drag-source");
-                  const ghost = card?.cloneNode(true) as HTMLElement | null;
-                  if (ghost) {
-                    ghost.style.position = "absolute";
-                    ghost.style.top = "-9999px";
-                    ghost.style.left = "-9999px";
-                    ghost.style.width = `${card?.offsetWidth ?? 200}px`;
-                    ghost.style.opacity = "0.9";
-                    ghost.style.pointerEvents = "none";
-                    if (keys.length > 1) {
-                      const badge = document.createElement("div");
-                      badge.textContent = String(keys.length);
-                      badge.style.cssText =
-                        "position:absolute;top:8px;right:8px;background:#c45c26;color:#fff;font:600 12px/1.2 system-ui,sans-serif;padding:4px 7px;border-radius:999px;";
-                      ghost.appendChild(badge);
-                    }
-                    document.body.appendChild(ghost);
-                    e.dataTransfer.setDragImage(
-                      ghost,
-                      Math.min(40, (card?.offsetWidth ?? 80) / 4),
-                      24,
-                    );
-                    requestAnimationFrame(() => ghost.remove());
-                  }
-                }
-              : undefined
-          }
-          onDragEnd={
-            editing
-              ? () => {
-                  markInteraction();
-                  ref.current?.classList.remove(
-                    "is-drag-source",
-                    "ring-1",
-                    "ring-ember/70",
-                  );
-                  document.body.classList.remove("is-gallery-dragging");
-                  window.setTimeout(() => {
-                    suppressOpenRef.current = false;
-                  }, 0);
-                }
-              : undefined
-          }
-          onClick={
-            editing
-              ? (e) => {
-                  e.stopPropagation();
-                  if (suppressOpenRef.current || resizingRef.current) {
-                    suppressOpenRef.current = false;
-                    clearOpenTimer();
-                    return;
-                  }
-                  const toggle = e.metaKey || e.ctrlKey;
-                  const range = e.shiftKey;
-                  if (toggle || range) {
-                    clearOpenTimer();
-                    markInteraction();
-                    onSelect(photoKey(photo), { toggle, range });
-                    window.setTimeout(() => {
-                      suppressOpenRef.current = false;
-                    }, 0);
-                    return;
-                  }
-                  clearOpenTimer();
-                  // Plain click selects this photo only (edit mode).
-                  onSelect(photoKey(photo), { toggle: false, range: false });
-                  // Delay so double-click can reset size without opening.
-                  openClickTimer.current = window.setTimeout(() => {
-                    openClickTimer.current = null;
-                    if (suppressOpenRef.current) return;
-                    onOpen(photo);
-                  }, 220);
-                }
-              : undefined
-          }
-          onDoubleClick={
-            editing
-              ? (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  clearOpenTimer();
-                  markInteraction();
-                  window.setTimeout(() => {
-                    suppressOpenRef.current = false;
-                  }, 0);
-                  if (Math.abs(liveScale - 1) < 0.01) return;
-                  setLiveScale(1);
-                  liveScaleRef.current = 1;
-                  onScale(photo, 1);
-                }
-              : undefined
-          }
           onContextMenu={(e) => e.preventDefault()}
         >
           <div
@@ -854,7 +263,16 @@ function GalleryCard({
               uniformColumn ? "flex justify-center" : ""
             }`}
           >
-            {editing ? (
+            <button
+              type="button"
+              onClick={() => onOpen(photo)}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`overflow-hidden text-left ${
+                uniformColumn
+                  ? "relative mx-auto block max-w-full"
+                  : "relative block w-full min-w-0"
+              }`}
+            >
               <ProtectedImage
                 src={photo.src}
                 alt={photo.title}
@@ -865,44 +283,6 @@ function GalleryCard({
                     ? "(max-width: 768px) 100vw, 580px"
                     : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
                 }
-                className={
-                  uniformColumn
-                    ? "pointer-events-none mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
-                    : "pointer-events-none h-auto w-full max-h-[85svh] object-contain md:max-h-none"
-                }
-                style={
-                  uniformColumn
-                    ? {
-                        width: "auto",
-                        height: "auto",
-                        maxHeight: "70svh",
-                        maxWidth: "100%",
-                      }
-                    : { width: "100%", height: "auto" }
-                }
-                draggable={false}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpen(photo)}
-                onContextMenu={(e) => e.preventDefault()}
-                className={`overflow-hidden text-left ${
-                  uniformColumn
-                    ? "relative mx-auto block max-w-full"
-                    : "relative block w-full min-w-0"
-                }`}
-              >
-                <ProtectedImage
-                  src={photo.src}
-                  alt={photo.title}
-                  width={800}
-                  height={600}
-                  sizes={
-                    uniformColumn
-                      ? "(max-width: 768px) 100vw, 580px"
-                      : "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
-                  }
                 className={
                   uniformColumn
                     ? "mx-auto h-auto max-h-[70svh] w-auto max-w-full object-contain"
@@ -918,247 +298,22 @@ function GalleryCard({
                       }
                     : { width: "100%", height: "auto" }
                 }
-                  draggable={false}
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-100 transition-opacity duration-500 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                  <p className="font-display text-xl italic text-paper">
-                    {photo.title}
+                draggable={false}
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent p-5 opacity-100 transition-opacity duration-500 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                <p className="font-display text-xl italic text-paper">
+                  {photo.title}
+                </p>
+                {!uniformColumn ? (
+                  <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
+                    {photo.categories.join(" · ")}
                   </p>
-                  {/* Ayoub (uniformColumn): title only — no collection membership labels */}
-                  {!uniformColumn ? (
-                    <p className="mt-1 font-brand text-sm tracking-[0.08em] text-paper-dim">
-                      {photo.categories.join(" · ")}
-                    </p>
-                  ) : null}
-                </div>
-              </button>
-            )}
+                ) : null}
+              </div>
+            </button>
           </div>
-
-          {editing ? (
-            <>
-              <ResizeHandle
-                edge="left"
-                cursor="cursor-ew-resize"
-                className="top-3 bottom-3 left-0 w-3 sm:w-3.5"
-                label="Resize from left"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-              <ResizeHandle
-                edge="right"
-                cursor="cursor-ew-resize"
-                className="top-3 bottom-3 right-0 w-3 sm:w-3.5"
-                label="Resize from right"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-              <ResizeHandle
-                edge="top-left"
-                cursor="cursor-nwse-resize"
-                className="top-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
-                label="Resize from top-left"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-              <ResizeHandle
-                edge="top-right"
-                cursor="cursor-nesw-resize"
-                className="top-0 right-0 h-4 w-4 sm:h-5 sm:w-5"
-                label="Resize from top-right"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-              <ResizeHandle
-                edge="bottom-left"
-                cursor="cursor-nesw-resize"
-                className="bottom-0 left-0 h-4 w-4 sm:h-5 sm:w-5"
-                label="Resize from bottom-left"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-              <ResizeHandle
-                edge="bottom-right"
-                cursor="cursor-nwse-resize"
-                className="right-0 bottom-0 h-4 w-4 sm:h-5 sm:w-5"
-                label="Resize from bottom-right"
-                scalePct={scalePct}
-                scalePctMax={scalePctMax}
-                onResize={startResize}
-              />
-
-              <span className="pointer-events-none absolute top-0.5 left-0.5 h-2.5 w-2.5 border-t border-l border-paper/90" />
-              <span className="pointer-events-none absolute top-0.5 right-0.5 h-2.5 w-2.5 border-t border-r border-paper/90" />
-              <span className="pointer-events-none absolute bottom-0.5 left-0.5 h-2.5 w-2.5 border-b border-l border-paper/90" />
-              <span className="pointer-events-none absolute right-0.5 bottom-0.5 h-2.5 w-2.5 border-r border-b border-paper/90" />
-              <span className="pointer-events-none absolute top-1/2 left-0.5 h-8 w-1 -translate-y-1/2 rounded-full bg-paper/75" />
-              <span className="pointer-events-none absolute top-1/2 right-0.5 h-8 w-1 -translate-y-1/2 rounded-full bg-paper/75" />
-
-              {pending ? (
-                <p className="pointer-events-none absolute top-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember">
-                  New
-                </p>
-              ) : null}
-              {replaced ? (
-                <p className="pointer-events-none absolute top-2 right-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember">
-                  Replaced
-                </p>
-              ) : null}
-            </>
-          ) : null}
-
-          {editing && soft ? (
-            <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-ink/80 px-2 py-1 font-brand text-[10px] tracking-[0.06em] text-ember/90">
-              Soft — past native resolution (advisory)
-            </p>
-          ) : null}
         </div>
       </div>
-
-      {editing ? (
-        <div className="mt-2 space-y-2">
-          <input
-            type="text"
-            value={photo.title}
-            disabled={busy}
-            onChange={(e) => onTitle(photo, e.target.value)}
-            aria-label="Photo title"
-            className="w-full border border-line bg-transparent px-3 py-2 font-display text-lg italic text-paper outline-none focus:border-ember disabled:opacity-50"
-          />
-          <div className="flex flex-wrap items-center justify-center gap-1">
-            <button
-              type="button"
-              disabled={busy || !canLeft}
-              onClick={() => onMove(index, "left")}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Swap with photo on the left"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canUp}
-              onClick={() => onMove(index, "up")}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Swap with photo above"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canDown}
-              onClick={() => onMove(index, "down")}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Swap with photo below"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              disabled={busy || !canRight}
-              onClick={() => onMove(index, "right")}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-paper disabled:opacity-30"
-              aria-label="Swap with photo on the right"
-            >
-              →
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onSelectRow(index)}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-xs tracking-[0.06em] text-paper-dim transition-colors hover:text-paper disabled:opacity-30"
-              aria-label="Select this grid row"
-              title="Select entire row"
-            >
-              Row
-            </button>
-            <span className="mx-1 inline-flex items-center gap-0.5 border border-line bg-ink/85 px-1 py-0.5">
-              <span className="px-1 text-fog" aria-hidden title="Zoom">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <circle cx="10.5" cy="10.5" r="6.5" />
-                  <path d="M16 16l5 5" />
-                </svg>
-              </span>
-              <button
-                type="button"
-                disabled={busy || liveScale <= SCALE_MIN}
-                onClick={() => {
-                  const next = clampScale(liveScale - 0.05, scaleMax);
-                  setLiveScale(next);
-                  liveScaleRef.current = next;
-                  onScale(photo, next);
-                }}
-                className="px-1.5 py-0.5 font-brand text-sm text-paper disabled:opacity-30"
-                aria-label="Zoom out"
-              >
-                −
-              </button>
-              <span className="min-w-10 text-center font-brand text-xs text-fog tabular-nums">
-                {scalePct}%
-              </span>
-              <button
-                type="button"
-                disabled={busy || liveScale >= scaleMax}
-                onClick={() => {
-                  const next = clampScale(liveScale + 0.05, scaleMax);
-                  setLiveScale(next);
-                  liveScaleRef.current = next;
-                  onScale(photo, next);
-                }}
-                className="px-1.5 py-0.5 font-brand text-sm text-paper disabled:opacity-30"
-                aria-label="Zoom in"
-              >
-                +
-              </button>
-            </span>
-            <button
-              type="button"
-              disabled={busy || !photo.id}
-              onClick={() => replaceInputRef.current?.click()}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-xs tracking-[0.04em] text-paper disabled:opacity-30"
-              aria-label="Replace photo file"
-            >
-              Replace
-            </button>
-            <input
-              ref={replaceInputRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (!file) return;
-                const err = queueReplace(photo, file);
-                if (err) window.alert(err);
-              }}
-            />
-            <button
-              type="button"
-              disabled={busy || !photo.id}
-              onClick={() => onRemove(photo)}
-              className="border border-line bg-ink/85 px-2 py-1 font-brand text-sm text-ember disabled:opacity-30"
-              aria-label="Delete photo"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -1179,189 +334,25 @@ export function Gallery({
   lockedCategory?: PhotoCategory;
   showFilters?: boolean;
   tightTop?: boolean;
-  /** Slightly less top padding than tightTop (Ayoub After Dark intro → gallery). */
   compactTop?: boolean;
-  /** Optional DOM id for in-page anchors. */
   sectionId?: string;
   items?: Photo[];
-  /**
-   * default — Fatni archive 3-column gallery (2 on tablet).
-   * ayoub — 2-column editorial on tablet/desktop, wider max width, quieter lightbox.
-   */
   presentation?: "default" | "ayoub";
 }) {
-  const {
-    editing,
-    draft,
-    orderBridge,
-    saving,
-    setPhotoTitle,
-    setPhotoScale,
-    removeFromCollection,
-    setViewOrder,
-    clearOrderBridgeIfMatched,
-  } = useAdmin();
   const ayoub = presentation === "ayoub";
-  const { cols, baseCellWidth, galleryRef } = useGalleryLayout(
-    ayoub ? "ayoub" : "fatni",
-  );
-  useDragAutoScroll(editing);
-  const source = items ?? photos;
-  const [filter, setFilter] = useState<PhotoCategory>(
-    lockedCategory ?? categories[0],
-  );
+  const { cols, galleryRef } = useGalleryLayout(ayoub ? "ayoub" : "fatni");
+  const source = items ?? [];
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [adminError, setAdminError] = useState<string | null>(null);
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const selectionAnchorRef = useRef<string | null>(null);
+  const room = lockedCategory ?? "Nature";
 
-  const room = lockedCategory ?? filter;
-
-  useEffect(() => {
-    setSelectedKeys([]);
-    selectionAnchorRef.current = null;
-  }, [room, editing]);
-
-  const filtered = useMemo(() => {
-    const list = source.filter((p) => photoInCategory(p, room));
-    return applyDraftToList(list, room, draft, orderBridge);
-  }, [draft, orderBridge, room, source]);
-
-  const keyToIndex = useMemo(() => {
-    const map = new Map<string, number>();
-    filtered.forEach((p, i) => map.set(photoKey(p), i));
-    return map;
-  }, [filtered]);
-
-  useEffect(() => {
-    const serverIds = source
-      .filter((p) => photoInCategory(p, room) && p.id)
-      .sort(
-        (a, b) =>
-          photoOrderInCategory(a, room) - photoOrderInCategory(b, room),
-      )
-      .map((p) => p.id as string);
-    clearOrderBridgeIfMatched(room, serverIds);
-  }, [source, room, clearOrderBridgeIfMatched]);
-
-  const selectFilter = (category: PhotoCategory) => {
-    setFilter(category);
-    setActiveIndex(null);
-  };
-
-  const openPhoto = (photo: Photo) => {
-    const i = filtered.findIndex((p) => p.src === photo.src);
-    if (i >= 0) setActiveIndex(i);
-  };
-
-  const onSelect = (
-    key: string,
-    mods: { toggle: boolean; range: boolean },
-  ) => {
-    const index = keyToIndex.get(key);
-    if (index == null) return;
-
-    if (mods.range && selectionAnchorRef.current) {
-      const anchor = keyToIndex.get(selectionAnchorRef.current);
-      if (anchor != null) {
-        const lo = Math.min(anchor, index);
-        const hi = Math.max(anchor, index);
-        const rangeKeys = filtered.slice(lo, hi + 1).map(photoKey);
-        setSelectedKeys(rangeKeys);
-        return;
-      }
-    }
-
-    if (mods.toggle) {
-      setSelectedKeys((prev) => {
-        if (prev.includes(key)) return prev.filter((k) => k !== key);
-        return [...prev, key];
-      });
-      selectionAnchorRef.current = key;
-      return;
-    }
-
-    setSelectedKeys([key]);
-    selectionAnchorRef.current = key;
-  };
-
-  const onSelectRow = (index: number) => {
-    const row = Math.floor(index / cols);
-    const start = row * cols;
-    const end = Math.min(start + cols, filtered.length);
-    const keys = filtered.slice(start, end).map(photoKey);
-    setSelectedKeys(keys);
-    selectionAnchorRef.current = keys[0] ?? null;
-  };
-
-  const onMove = (from: number, dir: "up" | "down" | "left" | "right") => {
-    const col = from % cols;
-    const row = Math.floor(from / cols);
-    let to = from;
-    if (dir === "left") {
-      if (col === 0) return;
-      to = from - 1;
-    } else if (dir === "right") {
-      if (col >= cols - 1 || from + 1 >= filtered.length) return;
-      to = from + 1;
-    } else if (dir === "up") {
-      if (row === 0) return;
-      to = from - cols;
-    } else if (dir === "down") {
-      to = from + cols;
-      if (to >= filtered.length) return;
-    }
-    if (to === from || to < 0 || to >= filtered.length) return;
-    const next = [...filtered];
-    const a = next[from];
-    const b = next[to];
-    if (!a || !b) return;
-    next[from] = b;
-    next[to] = a;
-    setViewOrder(room, next);
-  };
-
-  const onDropAt = (fromKeys: string[], toKey: string) => {
-    if (!fromKeys.length || !toKey) return;
-    const dropIndex = keyToIndex.get(toKey);
-    if (dropIndex == null) return;
-
-    const sourceIndices = indicesForKeys(fromKeys, keyToIndex);
-    if (!sourceIndices.length) return;
-
-    const destIndices = resolveMultiSwapDest(
-      filtered.length,
-      sourceIndices,
-      dropIndex,
+  const filtered = source
+    .filter((photo) => photoInCategory(photo, room))
+    .slice()
+    .sort(
+      (a, b) => photoOrderInCategory(a, room) - photoOrderInCategory(b, room),
     );
-    if (!destIndices) return;
 
-    const next = applyExactSwaps(filtered, sourceIndices, destIndices);
-    if (!next) return;
-    setViewOrder(room, next);
-  };
-
-  const onRemove = (photo: Photo) => {
-    if (
-      !window.confirm(
-        `Remove “${photo.title}” from ${room}? It will move to Unassigned / Hold after you Save.`,
-      )
-    ) {
-      return;
-    }
-    removeFromCollection(photo, room);
-  };
-
-  const onScale = (photo: Photo, next: number) => {
-    setPhotoScale(photo, next);
-  };
-
-  const onTitle = (photo: Photo, next: string) => {
-    setPhotoTitle(photo, next);
-  };
-
-  const showHeader =
-    Boolean(title) || (showFilters && !lockedCategory);
+  const showHeader = Boolean(title) || (showFilters && !lockedCategory);
 
   return (
     <section
@@ -1374,7 +365,7 @@ export function Gallery({
           : tightTop
             ? "pt-6 sm:pt-8"
             : "pt-10 sm:pt-14"
-      } ${editing ? "pb-28 sm:pb-32" : ""}`}
+      }`}
     >
       <div className={`mx-auto ${ayoub ? "max-w-[1160px]" : "max-w-7xl"}`}>
         {showHeader ? (
@@ -1399,46 +390,7 @@ export function Gallery({
             ) : (
               <div />
             )}
-            {showFilters && !lockedCategory ? (
-              <div className="flex w-full flex-col gap-4 md:w-auto md:flex-row md:items-center md:justify-end md:gap-x-8">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:gap-x-6">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => selectFilter(category)}
-                      className={`font-brand text-sm tracking-[0.08em] transition-colors ${
-                        filter === category
-                          ? "text-paper"
-                          : "text-fog hover:text-paper-dim"
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
-        ) : null}
-
-        {editing ? (
-          <>
-            <GalleryUploadZone room={room} onError={setAdminError} />
-            <p className="mb-6 font-brand text-sm text-fog">
-              Click to select · ⌘/Ctrl+click toggle · Shift+click range · Row
-              selects the grid row · drag selection to swap exactly with the
-              same number of photos · ←↑↓→ swap one · loupe or handles to
-              resize · double-click resets to 100% · ✕ removes from this
-              collection (Unassigned after Save). Save or Cancel below.
-              {selectedKeys.length > 0
-                ? ` · ${selectedKeys.length} selected`
-                : ""}
-            </p>
-          </>
-        ) : null}
-        {adminError ? (
-          <p className="mb-6 font-brand text-sm text-ember">{adminError}</p>
         ) : null}
 
         {filtered.length === 0 ? (
@@ -1456,24 +408,14 @@ export function Gallery({
           >
             {filtered.map((photo, index) => (
               <GalleryCard
-                key={photo.id ?? photo.src}
+                key={photo.id}
                 photo={photo}
                 index={index}
-                total={filtered.length}
-                onOpen={openPhoto}
-                editing={editing}
-                busy={saving}
-                baseCellWidth={baseCellWidth}
+                onOpen={(item) => {
+                  const i = filtered.findIndex((p) => p.id === item.id);
+                  if (i >= 0) setActiveIndex(i);
+                }}
                 cols={cols}
-                selected={selectedKeys.includes(photoKey(photo))}
-                selectedKeys={selectedKeys}
-                onSelect={onSelect}
-                onSelectRow={onSelectRow}
-                onMove={onMove}
-                onRemove={onRemove}
-                onScale={onScale}
-                onTitle={onTitle}
-                onDropAt={onDropAt}
                 uniformColumn={ayoub}
               />
             ))}

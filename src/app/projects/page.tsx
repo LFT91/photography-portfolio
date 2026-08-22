@@ -13,8 +13,6 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/projects",
 });
 
-export const dynamic = "force-dynamic";
-
 export default async function ProjectsPage() {
   if (!isAyoubSite()) notFound();
 

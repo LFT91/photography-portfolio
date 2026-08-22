@@ -14,7 +14,7 @@ The same codebase serves both. Site ID selects navigation, routes, and which Sup
 - **Public app** — server-rendered pages, CSS grid galleries, client lightbox only where interaction is required.
 - **Admin** — `/admin` only. `AdminProvider` mounts in the admin layout, not the public root.
 - **Catalogue** — production reads Supabase `collections → collection_photos → photos`. There is no silent fallback to the static fixture.
-- **Images** — masters live in `masters/images/`. Web derivatives in `public/images/` (tile ~800px, display ~1800px, dedicated hero). Supabase-hosted originals are rewritten to Storage image transforms.
+- **Images** — camera originals are **not in Git**. Web derivatives live in `public/images/` (tile ~800px, display ~1800px, dedicated hero). Supabase-hosted originals are rewritten to Storage image transforms.
 - **Auth / RLS** — public `SELECT`; writes require `public.is_app_admin()`.
 
 ## Local setup
@@ -83,17 +83,20 @@ The sites/collections migration seeds the existing production admin UUID when th
 
 ## Photography workflow
 
-1. Put the camera original in `masters/images/…` (never overwrite masters).
-2. `npm run images` writes:
+Camera originals are not in Git. Keep them in an offline archive and point the generator at that folder.
+
+1. Add the camera original to the off-repo masters directory (never overwrite a master in place).
+2. `MASTERS_DIR=/path/to/masters/images npm run images` writes:
    - `public/images/<path>` display JPEG
    - `public/images/tile/<path>` tile JPEG
    - `public/images/hero/startrails.jpg` for the Fatni homepage
    - `src/data/image-manifest.json`
+   - and deletes stale files under `public/images/` that no longer have a master
 3. Add or replace the row in Supabase (`photos`) via `/admin`.
 4. Assign it to a collection and set order in `/admin/collections`.
 5. Save triggers `revalidatePath("/", "layout")` so public pages refresh (ISR, 60s).
 
-Public pages request tile/display/hero derivatives, not masters. Masters are outside `public/` and are omitted from Vercel uploads.
+Public pages request tile/display/hero derivatives, not masters.
 
 ## Public routes
 

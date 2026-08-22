@@ -44,6 +44,7 @@ yarn-error.log*
 .after-dark-scan/
 tmp/
 *.tmp
+.curator.pid
 
 # Camera originals — keep outside Git. See masters/README.md
 /masters/images/

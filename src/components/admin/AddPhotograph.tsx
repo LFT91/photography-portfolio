@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CuratorCollection } from "@/lib/admin/types";
+import { collectionOptionLabel } from "@/components/admin/photo-drag";
 
 export function AddPhotograph({
   collections,
-  disabledReason,
+  mastersArchiveLabel,
   onUploaded,
 }: {
   collections: CuratorCollection[];
-  disabledReason: string | null;
+  mastersArchiveLabel: string;
   onUploaded: (payload: unknown) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -22,12 +23,19 @@ export function AddPhotograph({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const disabled = Boolean(disabledReason);
-
   const collection = useMemo(
     () => collections.find((item) => item.id === collectionId),
     [collectionId, collections],
   );
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const onFile = (next: File | null) => {
     setFile(next);
@@ -41,7 +49,7 @@ export function AddPhotograph({
   };
 
   const submit = async () => {
-    if (!file || disabled) return;
+    if (!file) return;
     setBusy(true);
     setError(null);
     const body = new FormData();
@@ -72,34 +80,33 @@ export function AddPhotograph({
   };
 
   return (
-    <div>
+    <>
       <button
         type="button"
-        disabled={disabled}
-        title={disabledReason ?? undefined}
+        className="curator-btn"
         onClick={() => setOpen(true)}
-        className="border border-ember px-3 py-1.5 font-brand text-sm text-ember disabled:opacity-40"
       >
         Add Photograph
       </button>
-      {disabled ? (
-        <p className="mt-2 max-w-sm font-brand text-xs leading-relaxed text-fog">
-          {disabledReason}
-        </p>
-      ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/80 p-4">
-          <div className="w-full max-w-lg border border-line bg-ink p-5">
-            <h2 className="font-display text-2xl italic text-paper">
-              Add Photograph
-            </h2>
-            <label className="mt-4 block font-brand text-sm text-fog">
-              Image
+        <>
+          <button
+            type="button"
+            className="curator-backdrop"
+            aria-label="Close Add Photograph"
+            onClick={() => setOpen(false)}
+          />
+          <aside className="curator-drawer" role="dialog" aria-labelledby="add-photo-title">
+            <h2 id="add-photo-title">Add Photograph</h2>
+            <p className="curator-drawer-help">
+              Originals are safely copied to {mastersArchiveLabel}.
+            </p>
+            <label className="curator-field">
+              <span>Image</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/tiff,.jpg,.jpeg,.png,.webp,.tif,.tiff"
-                className="mt-1 block w-full text-paper"
                 onChange={(event) => onFile(event.target.files?.[0] ?? null)}
               />
             </label>
@@ -108,57 +115,56 @@ export function AddPhotograph({
               <img
                 src={preview}
                 alt="Selected photograph preview"
-                className="mt-3 max-h-56 w-full object-contain"
+                className="curator-drawer-preview"
               />
             ) : null}
-            <label className="mt-3 block font-brand text-sm text-fog">
-              Title
+            <label className="curator-field">
+              <span>Title</span>
               <input
+                type="text"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 w-full border border-line bg-transparent px-2 py-1 text-paper"
               />
             </label>
-            <label className="mt-3 block font-brand text-sm text-fog">
-              Collection
+            <label className="curator-field">
+              <span>Collection</span>
               <select
                 value={collectionId}
                 onChange={(event) => setCollectionId(event.target.value)}
-                className="mt-1 w-full border border-line bg-ink px-2 py-1 text-paper"
               >
                 {collections.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.site === "fatni" ? "Fatni" : "Ayoub"} / {item.title}
+                    {collectionOptionLabel(item.site, item.title)}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="mt-3 block font-brand text-sm text-fog">
-              Position (0 = first, blank = end
-              {collection ? `, ${collection.photoIds.length} current` : ""})
+            <label className="curator-field">
+              <span>
+                Position (0 = first, blank = end
+                {collection ? `, ${collection.photoIds.length} current` : ""})
+              </span>
               <input
+                type="text"
+                inputMode="numeric"
                 value={position}
                 onChange={(event) => setPosition(event.target.value)}
-                inputMode="numeric"
-                className="mt-1 w-full border border-line bg-transparent px-2 py-1 text-paper"
               />
             </label>
-            <label className="mt-3 block font-brand text-sm text-fog">
-              displayScale (optional)
+            <label className="curator-field">
+              <span>displayScale (optional)</span>
               <input
+                type="text"
                 value={displayScale}
-                onChange={(event) => setDisplayScale(event.target.value)}
                 placeholder="1"
-                className="mt-1 w-full border border-line bg-transparent px-2 py-1 text-paper"
+                onChange={(event) => setDisplayScale(event.target.value)}
               />
             </label>
-            {error ? (
-              <p className="mt-3 font-brand text-sm text-ember">{error}</p>
-            ) : null}
-            <div className="mt-5 flex justify-end gap-2">
+            {error ? <p className="curator-error">{error}</p> : null}
+            <div className="curator-drawer-actions">
               <button
                 type="button"
-                className="border border-line px-3 py-1.5 font-brand text-sm text-paper"
+                className="curator-btn curator-btn-quiet"
                 onClick={() => setOpen(false)}
               >
                 Cancel
@@ -166,15 +172,15 @@ export function AddPhotograph({
               <button
                 type="button"
                 disabled={!file || !title || busy}
-                className="border border-ember px-3 py-1.5 font-brand text-sm text-ember disabled:opacity-40"
+                className="curator-btn curator-btn-primary"
                 onClick={() => void submit()}
               >
                 {busy ? "Adding…" : "Add to catalogue"}
               </button>
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       ) : null}
-    </div>
+    </>
   );
 }

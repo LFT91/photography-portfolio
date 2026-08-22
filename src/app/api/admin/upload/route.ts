@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 import { NextResponse } from "next/server";
 import { addToCollection, cloneDraft } from "@/lib/admin/draft";
-import { getMastersStatus } from "@/lib/admin/masters";
+import { ensureMastersDir } from "@/lib/admin/masters";
 import { allocatePhotoId } from "@/lib/admin/photo-id";
 import { readCatalogFromDisk } from "@/lib/admin/catalog-writer";
 import { UPLOAD_FOLDER } from "@/lib/admin/shape";
@@ -30,12 +30,15 @@ function publicRelsFor(masterRel: string) {
   return [keepRel, `small/${keepRel}`, `tile/${keepRel}`, `large/${keepRel}`];
 }
 
-function runGenerate(rel: string) {
+function runGenerate(rel: string, mastersDir: string) {
   return new Promise<{ ok: boolean; output: string }>((resolvePromise) => {
     const child = spawn(
       process.execPath,
       ["scripts/generate-images.mjs", "--file", rel],
-      { cwd: root, env: process.env },
+      {
+        cwd: root,
+        env: { ...process.env, MASTERS_DIR: mastersDir },
+      },
     );
     let output = "";
     child.stdout?.on("data", (chunk) => {
@@ -69,12 +72,9 @@ export async function POST(request: Request) {
   const forbidden = forbiddenOrNull(request);
   if (forbidden) return forbidden;
 
-  const masters = getMastersStatus();
+  const masters = ensureMastersDir();
   if (!masters.ok) {
-    return NextResponse.json(
-      { error: "Add Photograph is disabled", reason: masters.reason },
-      { status: 409 },
-    );
+    return jsonError(masters.reason, 409);
   }
 
   const form = await request.formData();
@@ -108,6 +108,15 @@ export async function POST(request: Request) {
   const folder = UPLOAD_FOLDER[collectionId];
   const masterRel = `${folder}/${id}${ext}`;
   const masterPath = resolve(masters.dir, masterRel);
+  const inside = relative(masters.dir, masterPath);
+  if (
+    !inside ||
+    inside.startsWith("..") ||
+    inside.split(/[\\/]/).includes("..") ||
+    masterPath === masters.dir
+  ) {
+    return jsonError("Could not write the master file.");
+  }
   const keepRel = outputRelFor(masterRel);
   const src = `/images/${keepRel}`;
   const previousManifest = existsSync(manifestPath)
@@ -131,7 +140,7 @@ export async function POST(request: Request) {
     return jsonError("Could not write the master file.");
   }
 
-  const generated = await runGenerate(masterRel);
+  const generated = await runGenerate(masterRel, masters.dir);
   if (!generated.ok) {
     rmSync(masterPath, { force: true });
     removePublicOutputs(masterRel);

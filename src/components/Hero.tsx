@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { ArtistStagePrint } from "@/components/ArtistStagePrint";
-import { ProtectedImage } from "@/components/ProtectedImage";
-import { heroImage, type Photo } from "@/data/photos";
+import { PhotoImage } from "@/components/PhotoImage";
 import { isAyoubSite } from "@/lib/site";
 
 function FatniHero() {
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden">
       <div className="absolute inset-0 animate-hero-image">
-        <ProtectedImage
-          src={heroImage.src}
-          alt={heroImage.title}
+        <PhotoImage
+          src="/images/after-dark/startrails.jpg"
+          alt="Star Trails"
+          variant="hero"
           fill
           priority
           sizes="100vw"
@@ -18,7 +17,6 @@ function FatniHero() {
         />
       </div>
 
-      {/* Keep the photo visible, but darken behind the text so type stays readable */}
       <div className="absolute inset-0 bg-ink/25" aria-hidden />
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(11,12,14,0.72)_0%,rgba(11,12,14,0.35)_45%,rgba(11,12,14,0.2)_100%)]"
@@ -43,52 +41,42 @@ function FatniHero() {
   );
 }
 
-/**
- * Ayoub: contained homepage photograph on black + ENTER.
- * Brand name lives only in the header.
- */
-function AyoubHero({ cover }: { cover?: Photo | null }) {
+function AyoubHero() {
   return (
     <section className="relative flex h-svh items-center justify-center overflow-hidden bg-ink">
-      {cover ? (
-        <div className="relative inline-flex">
-          <ArtistStagePrint
-            src={cover.src}
-            alt=""
-            priority
-            mode="height"
-            blend="beams"
-          />
-          {/* Anchored to the lit window bay on the façade print */}
-          <Link
-            href="/projects/after-dark"
-            className="animate-rise delay-2 absolute left-[44.35%] top-[51.5%] z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 border border-white/50 bg-black/45 px-5 py-2.5 font-brand text-xs tracking-[0.16em] text-white/95 backdrop-blur-[2px] transition-colors hover:border-white hover:text-white sm:gap-3 sm:px-6 sm:py-3 sm:text-sm"
-          >
-            ENTER
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div
-            className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(26,29,34,0.9)_0%,rgba(11,12,14,1)_70%)]"
-            aria-hidden
-          />
-          <div className="relative z-10 mx-auto flex w-full max-w-3xl justify-center px-5 sm:px-8">
-            <Link
-              href="/projects/after-dark"
-              className="animate-rise delay-2 inline-flex items-center gap-3 border border-white/55 bg-black/45 px-6 py-3 font-brand text-sm tracking-[0.16em] text-white/95 transition-colors hover:border-white hover:text-white"
-            >
-              ENTER
-              <span aria-hidden>→</span>
-            </Link>
-          </div>
-        </>
-      )}
+      <div className="relative inline-flex max-h-[89svh] max-w-[96vw]">
+        <PhotoImage
+          src="/images/ayoub-homepage.png"
+          alt=""
+          variant="display"
+          priority
+          sizes="96vw"
+          className="protect-media pointer-events-none h-auto max-h-[89svh] w-auto max-w-[96vw] select-none object-contain"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: [
+              "linear-gradient(to right, rgba(11,12,14,0.97) 0%, transparent 11%, transparent 89%, rgba(11,12,14,0.97) 100%)",
+              "linear-gradient(to bottom, rgba(11,12,14,0.55) 0%, transparent 9%, transparent 91%, rgba(11,12,14,0.75) 100%)",
+              "radial-gradient(ellipse at center, transparent 50%, rgba(11,12,14,0.4) 100%)",
+            ].join(", "),
+          }}
+        />
+        {/* Percentages are of the print box (object-contain), so they stay on the lit window. */}
+        <Link
+          href="/projects/after-dark"
+          className="animate-rise delay-2 absolute left-[44.35%] top-[51.5%] z-10 inline-flex min-h-11 -translate-x-1/2 -translate-y-1/2 items-center gap-2 border border-white/50 bg-black/45 px-5 py-2.5 font-brand text-xs tracking-[0.16em] text-white/95 backdrop-blur-[2px] transition-colors hover:border-white hover:text-white sm:gap-3 sm:px-6 sm:py-3 sm:text-sm"
+        >
+          ENTER
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
     </section>
   );
 }
 
-export function Hero({ ayoubCover = null }: { ayoubCover?: Photo | null }) {
-  return isAyoubSite() ? <AyoubHero cover={ayoubCover} /> : <FatniHero />;
+export function Hero() {
+  return isAyoubSite() ? <AyoubHero /> : <FatniHero />;
 }

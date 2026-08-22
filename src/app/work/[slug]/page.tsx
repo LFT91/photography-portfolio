@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CollectionAdjacentNav } from "@/components/CollectionAdjacentNav";
 import { Footer } from "@/components/Footer";
-import { Gallery } from "@/components/Gallery";
 import { Header } from "@/components/Header";
-import { fatniDefBySlug } from "@/lib/fatni-collections";
-import { getCollectionPhotos } from "@/lib/photos";
+import { PhotoGrid } from "@/components/PhotoGrid";
+import { fatniCollectionBySlug, FATNI_COLLECTION_DEFS } from "@/content/collections";
+import { getCollectionPhotos } from "@/lib/catalog";
+import { variantsFor } from "@/lib/image";
 import { publicPageMetadata } from "@/lib/seo";
-import { isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
+import { getPublicSiteUrl, isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
+export function generateStaticParams() {
+  return FATNI_COLLECTION_DEFS.map((collection) => ({
+    slug: collection.slug,
+  }));
+}
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -19,15 +24,36 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const def = fatniDefBySlug(slug);
-  if (!def || def.special) {
+  const def = fatniCollectionBySlug(slug);
+  if (!def) {
     return { title: sitePageTitle("Collections") };
   }
-  return publicPageMetadata({
+
+  const photos = getCollectionPhotos(def.title);
+  const cover = photos[0];
+  const metadata = publicPageMetadata({
     title: def.title,
     description: def.description,
     path: def.href,
   });
+
+  if (cover) {
+    const image = variantsFor(cover.src).display;
+    const origin = getPublicSiteUrl();
+    metadata.openGraph = {
+      ...metadata.openGraph,
+      images: [
+        {
+          url: image.src.startsWith("http") ? image.src : `${origin}${image.src}`,
+          width: image.width,
+          height: image.height,
+          alt: cover.title,
+        },
+      ],
+    };
+  }
+
+  return metadata;
 }
 
 export default async function FatniCollectionPage({ params }: PageProps) {
@@ -36,30 +62,18 @@ export default async function FatniCollectionPage({ params }: PageProps) {
   }
 
   const { slug } = await params;
-
-  if (slug === "after-dark") {
+  const def = fatniCollectionBySlug(slug);
+  if (!def) {
     notFound();
   }
 
-  const def = fatniDefBySlug(slug);
-  if (!def || def.special) {
-    notFound();
-  }
-
-  const photos = await getCollectionPhotos(def.title);
+  const photos = getCollectionPhotos(def.title);
 
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
-        <Gallery
-          title={def.title}
-          showFilters={false}
-          lockedCategory={def.title}
-          tightTop
-          items={photos}
-          presentation="default"
-        />
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
+        <PhotoGrid title={def.title} tightTop items={photos} />
         <CollectionAdjacentNav slug={def.slug} />
       </main>
       <Footer />

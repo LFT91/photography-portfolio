@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { fatniArchiveCollections } from "@/lib/fatni-collections";
+import { FATNI_COLLECTION_DEFS } from "@/content/collections";
 import {
   FATNI_PUBLIC_URL,
   FATNI_SITE_NAME,
@@ -26,10 +26,10 @@ export const FATNI_CONTACT_DESCRIPTION =
 
 /** Existing hero / share photograph already used for Open Graph. */
 export const SHARE_IMAGE = {
-  url: "/images/startrails.jpg",
-  width: 1920,
-  height: 1280,
-  alt: "Star trails over a mountain landscape",
+  url: "/images/hero/startrails.jpg",
+  width: 1600,
+  height: 1364,
+  alt: "Star Trails",
 } as const;
 
 export function isPreviewDeployment(): boolean {
@@ -109,7 +109,7 @@ export function publicSitemapPaths(): string[] {
   return [
     "/",
     "/work",
-    ...fatniArchiveCollections().map((collection) => collection.href),
+    ...FATNI_COLLECTION_DEFS.map((collection) => collection.href),
     "/about",
     "/contact",
   ];
@@ -123,9 +123,10 @@ export function sitemapEntries(): { url: string }[] {
 }
 
 export function canonicalPath(path: string): string {
-  if (path === "/") return `${getPublicSiteUrl()}/`;
+  const origin = getPublicSiteUrl();
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  return path;
+  if (path === "/") return `${origin}/`;
+  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export function fatniHomeJsonLd() {

@@ -39,7 +39,10 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
-# local photo review dumps
+# local / generated scratch
 .after-dark-scan/
+tmp/
+
+# Camera originals — keep outside Git. See masters/README.md
+/masters/images/

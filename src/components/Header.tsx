@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useId, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import {
   getActiveSite,
@@ -49,6 +49,7 @@ export function Header({ solid = false }: { solid?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const showBar = solid || scrolled || open;
+  const menuId = useId();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -68,7 +69,6 @@ export function Header({ solid = false }: { solid?: boolean }) {
     };
   }, [open]);
 
-  // Close mobile menu if viewport grows past the md breakpoint
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
     const onChange = () => {
@@ -77,6 +77,15 @@ export function Header({ solid = false }: { solid?: boolean }) {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <>
@@ -101,7 +110,10 @@ export function Header({ solid = false }: { solid?: boolean }) {
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-10 md:flex">
+          <nav
+            aria-label="Primary"
+            className="hidden items-center gap-10 md:flex"
+          >
             {links.map((link) => {
               const active = linkIsActive(pathname, link);
               return (
@@ -122,7 +134,8 @@ export function Header({ solid = false }: { solid?: boolean }) {
             type="button"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
-            className="relative z-[61] flex h-10 w-10 shrink-0 items-center justify-center md:hidden"
+            aria-controls={menuId}
+            className="relative z-[61] flex h-11 w-11 shrink-0 items-center justify-center md:hidden"
             onClick={() => setOpen((v) => !v)}
           >
             <span className="sr-only">Menu</span>
@@ -145,16 +158,20 @@ export function Header({ solid = false }: { solid?: boolean }) {
         </div>
       </header>
 
-      {/* Sibling of header — must not sit inside backdrop-filter (traps fixed) */}
       <div
+        id={menuId}
         className={`fixed inset-0 z-[55] bg-ink transition-opacity duration-300 md:hidden ${
           open
             ? "pointer-events-auto opacity-100"
             : "pointer-events-none opacity-0"
         }`}
-        aria-hidden={!open}
+        hidden={!open}
+        inert={!open}
       >
-        <nav className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-16 sm:gap-8">
+        <nav
+          aria-label="Primary"
+          className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-16 sm:gap-8"
+        >
           {links.map((link) => (
             <NavItem
               key={`${link.label}:${link.href}`}

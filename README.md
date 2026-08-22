@@ -1,46 +1,84 @@
 # Fatni Photography
 
-Next.js portfolio for **Fatni Photography** (Ayoub El Fatni) — travel, street, and After Dark.
+One repository, two public photography sites:
+
+| Deployment | `NEXT_PUBLIC_SITE_ID` | Production origin |
+| --- | --- | --- |
+| Fatni Photography | `fatni-photography` (default) | https://www.fatniphotography.com |
+| Ayoub El Fatni | `ayoub-el-fatni` | https://ayoub-el-fatni.vercel.app |
+
+They share frontend primitives and one static catalogue. They are not one public site.
+
+## Architecture
+
+Next.js + a typed static catalogue + two site configurations + pre-generated responsive JPEGs + Vercel + CI.
+
+```
+site config
+  → collection
+  → ordered photo IDs
+  → photo metadata
+  → static derivative
+  → gallery / lightbox
+```
+
+There is no production database, no SQL, no Supabase, and no admin CMS.
+
+- Catalogue: `src/content/photos.ts`, `src/content/collections.ts`, `src/content/sites.ts`
+- Images: `public/images/` (small 480 / tile 800 / large 1200 / lightbox 1800 / dedicated hero 1600)
+- Camera originals stay **outside Git**
 
 ## Local
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Site uses the local catalog in `src/data/photos.ts` until Supabase has photos.
-
-## Supabase (admin upload / remove / reorder)
-
-1. Create a free project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `supabase/migrations/20260806000000_photos.sql`.
-3. **Authentication → Users** → add yourself (email + password).
-4. Copy Project URL + anon key from **Settings → API**.
-5. Copy `.env.example` to `.env.local` and fill:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-6. Restart `npm run dev`, open `/admin`, sign in, upload photos.
-
-Public gallery reads Supabase when the `photos` table has rows; otherwise it falls back to the local catalog.
-
-## Vercel
+`NEXT_PUBLIC_SITE_ID` selects the brand. Omit it to work on Fatni.
 
 ```bash
-npx vercel login
-npx vercel --prod
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
-Add the same env vars in **Vercel → Project → Settings → Environment Variables**, then redeploy.
+## Photography workflow
 
-### Custom domain
+1. Add the camera original to the durable off-repo master archive. Never overwrite a master in place.
+2. Add or update the photograph in `src/content/photos.ts` and place its ID in the correct ordered array in `src/content/collections.ts`.
+3. `MASTERS_DIR=/path/to/masters/images npm run images`
+4. Review locally (`npm run dev`).
+5. Commit and push. CI runs lint, typecheck, tests, and both site builds. Vercel deploys.
 
-1. Buy a domain (e.g. `fatni.photography` or `fatniphotography.com`).
-2. In Vercel → **Settings → Domains** → add it.
-3. Follow Vercel’s DNS instructions at your registrar.
+`npm run images` never writes to masters. If a public catalogue photograph has no master, it fails before pruning stale files under `public/images/`.
 
-Admin stays at `https://your-domain.com/admin` (bookmark only — not linked on public pages).
+Do not run the generator against an incomplete master archive.
+
+## Public routes
+
+**Fatni:** `/`, `/work`, `/work/{nature,urban,astro,street,monochrome}`, `/about`, `/contact`. `/after-dark` redirects to `/work`.
+
+**Ayoub:** `/`, `/projects`, `/projects/after-dark`, `/monochrome`, `/about`, `/contact`. `/work` redirects to `/projects/after-dark`.
+
+## Deployment
+
+Two Vercel projects, same repository, different env:
+
+**Fatni**
+
+```
+NEXT_PUBLIC_SITE_ID=fatni-photography
+NEXT_PUBLIC_SITE_URL=https://www.fatniphotography.com
+```
+
+**Ayoub**
+
+```
+NEXT_PUBLIC_SITE_ID=ayoub-el-fatni
+NEXT_PUBLIC_SITE_URL=https://ayoub-el-fatni.vercel.app
+```
+
+Cross-site nav uses those production origins, not preview hostnames.

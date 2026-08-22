@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getCollectionPhotos } from "@/lib/photos";
+import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
@@ -13,18 +13,16 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/projects",
 });
 
-export const dynamic = "force-dynamic";
-
-export default async function ProjectsPage() {
+export default function ProjectsPage() {
   if (!isAyoubSite()) notFound();
 
-  const afterDark = await getCollectionPhotos("After Dark");
+  const afterDark = getCollectionPhotos("After Dark");
   const count = afterDark.length;
 
   return (
     <>
       <Header solid />
-      <main className="min-h-svh pt-16 sm:pt-20">
+      <main id="main" className="min-h-svh pt-16 sm:pt-20">
         <section className="bg-ink px-5 pb-24 pt-10 sm:px-8 sm:pt-14">
           <div className="mx-auto max-w-7xl">
             <h1 className="font-display text-4xl italic text-paper sm:text-5xl">

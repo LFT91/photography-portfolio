@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AfterDark } from "@/components/AfterDark";
 import { Header } from "@/components/Header";
-import { getCollectionPhotos } from "@/lib/photos";
+import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
@@ -13,18 +13,14 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/projects/after-dark",
 });
 
-export const dynamic = "force-dynamic";
-
-export default async function AyoubAfterDarkPage() {
+export default function AyoubAfterDarkPage() {
   if (!isAyoubSite()) notFound();
-
-  const items = await getCollectionPhotos("After Dark");
 
   return (
     <>
       <Header />
-      <main>
-        <AfterDark items={items} variant="ayoub" />
+      <main id="main">
+        <AfterDark items={getCollectionPhotos("After Dark")} />
       </main>
     </>
   );

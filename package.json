@@ -2,16 +2,19 @@
   "name": "fatni-photography",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/__tests__/*.test.ts"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test --test-concurrency=1 src/lib/__tests__/*.test.ts",
+    "images": "node scripts/generate-images.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.4",
-    "@supabase/supabase-js": "^2.112.1",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -23,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "sharp": "^0.34.4",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
     "typescript": "^5"

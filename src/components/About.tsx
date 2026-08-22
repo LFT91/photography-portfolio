@@ -1,4 +1,4 @@
-import { ProtectedImage } from "@/components/ProtectedImage";
+import { PhotoImage } from "@/components/PhotoImage";
 import {
   AYOUB_PUBLIC_URL,
   FATNI_PUBLIC_URL,
@@ -29,11 +29,11 @@ function FatniAbout() {
           <h1 className="mb-8 font-brand text-3xl font-medium tracking-[0.02em] text-paper sm:text-4xl">
             Who I am
           </h1>
-          <ProtectedImage
+          <PhotoImage
             src="/images/about.jpg"
             alt="Ayoub El Fatni in the forest"
-            width={682}
-            height={1024}
+            variant="display"
+            sizes="(max-width: 640px) 100vw, 26rem"
             className="h-auto w-full max-w-[22rem] object-cover sm:max-w-[26rem]"
             style={{
               width: "100%",

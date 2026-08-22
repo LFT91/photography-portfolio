@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { fatniAdjacentArchive } from "@/lib/fatni-collections";
+import { fatniAdjacent } from "@/content/collections";
 
 /** Quiet prev/next between Fatni archive rooms (excludes After Dark). */
 export function CollectionAdjacentNav({ slug }: { slug: string }) {
-  const { prev, next } = fatniAdjacentArchive(slug);
+  const { prev, next } = fatniAdjacent(slug);
   if (!prev && !next) return null;
 
   return (

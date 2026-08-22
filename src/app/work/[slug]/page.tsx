@@ -4,19 +4,14 @@ import { CollectionAdjacentNav } from "@/components/CollectionAdjacentNav";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { PhotoGrid } from "@/components/PhotoGrid";
+import { fatniCollectionBySlug, FATNI_COLLECTION_DEFS } from "@/content/collections";
 import { getCollectionPhotos } from "@/lib/catalog";
-import {
-  fatniArchiveCollections,
-  fatniDefBySlug,
-} from "@/lib/fatni-collections";
 import { variantsFor } from "@/lib/image";
 import { publicPageMetadata } from "@/lib/seo";
 import { getPublicSiteUrl, isAyoubSite, isFatniSite, sitePageTitle } from "@/lib/site";
 
-export const revalidate = 60;
-
 export function generateStaticParams() {
-  return fatniArchiveCollections().map((collection) => ({
+  return FATNI_COLLECTION_DEFS.map((collection) => ({
     slug: collection.slug,
   }));
 }
@@ -29,12 +24,12 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const def = fatniDefBySlug(slug);
-  if (!def || def.special) {
+  const def = fatniCollectionBySlug(slug);
+  if (!def) {
     return { title: sitePageTitle("Collections") };
   }
 
-  const photos = await getCollectionPhotos(def.title);
+  const photos = getCollectionPhotos(def.title);
   const cover = photos[0];
   const metadata = publicPageMetadata({
     title: def.title,
@@ -45,14 +40,11 @@ export async function generateMetadata({
   if (cover) {
     const image = variantsFor(cover.src).display;
     const origin = getPublicSiteUrl();
-    const url = image.src.startsWith("http")
-      ? image.src
-      : `${origin}${image.src}`;
     metadata.openGraph = {
       ...metadata.openGraph,
       images: [
         {
-          url,
+          url: image.src.startsWith("http") ? image.src : `${origin}${image.src}`,
           width: image.width,
           height: image.height,
           alt: cover.title,
@@ -70,17 +62,12 @@ export default async function FatniCollectionPage({ params }: PageProps) {
   }
 
   const { slug } = await params;
-
-  if (slug === "after-dark") {
+  const def = fatniCollectionBySlug(slug);
+  if (!def) {
     notFound();
   }
 
-  const def = fatniDefBySlug(slug);
-  if (!def || def.special) {
-    notFound();
-  }
-
-  const photos = await getCollectionPhotos(def.title);
+  const photos = getCollectionPhotos(def.title);
 
   return (
     <>

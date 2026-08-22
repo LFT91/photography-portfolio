@@ -18,6 +18,13 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      - name: Build Fatni
+        run: npm run build
         env:
-          USE_LOCAL_CATALOG: "1"
+          NEXT_PUBLIC_SITE_ID: fatni-photography
+          NEXT_PUBLIC_SITE_URL: https://www.fatniphotography.com
+      - name: Build Ayoub
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_ID: ayoub-el-fatni
+          NEXT_PUBLIC_SITE_URL: https://ayoub-el-fatni.vercel.app

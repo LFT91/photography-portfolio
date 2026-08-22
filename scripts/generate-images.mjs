@@ -5,13 +5,17 @@
  * Masters are never written. They live outside this repository.
  * Point MASTERS_DIR at the folder that contains after-dark/, nature/, …
  *
- * This writes:
- *   public/images/<path>        display (~1800px long edge)
- *   public/images/tile/<path>   tile (~800px long edge)
+ * Writes:
+ *   public/images/small/<path>   ~480px
+ *   public/images/tile/<path>    ~800px
+ *   public/images/large/<path>   ~1200px
+ *   public/images/<path>         ~1800px (lightbox)
  *   public/images/hero/startrails.jpg
  *   src/data/image-manifest.json
  *
  * After a successful run, stale files under public/images/ are removed.
+ * If any public catalogue photograph has no master, the run fails
+ * before pruning.
  *
  * Usage: MASTERS_DIR=/path/to/masters/images npm run images
  */
@@ -23,7 +27,7 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -31,12 +35,17 @@ import sharp from "sharp";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicImages = path.join(root, "public", "images");
 const manifestPath = path.join(root, "src", "data", "image-manifest.json");
+const catalogPath = path.join(root, "src", "content", "photos.ts");
 
-const DISPLAY_EDGE = 1800;
+const SMALL_EDGE = 480;
 const TILE_EDGE = 800;
+const LARGE_EDGE = 1200;
+const DISPLAY_EDGE = 1800;
 const HERO_EDGE = 1600;
-const DISPLAY_QUALITY = 84;
+const SMALL_QUALITY = 76;
 const TILE_QUALITY = 78;
+const LARGE_QUALITY = 80;
+const DISPLAY_QUALITY = 84;
 const HERO_QUALITY = 72;
 
 const HERO_SOURCE = "after-dark/startrails.jpg";
@@ -44,11 +53,9 @@ const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"]);
 
 function resolveMastersDir() {
   const fromEnv = process.env.MASTERS_DIR?.trim();
-  const candidates = [
-    fromEnv,
-    path.join(root, "masters", "images"),
-    "/home/ubuntu/fatni-photography-masters/images",
-  ].filter(Boolean);
+  const candidates = [fromEnv, path.join(root, "masters", "images")].filter(
+    Boolean,
+  );
 
   for (const candidate of candidates) {
     const resolved = path.resolve(candidate);
@@ -87,7 +94,10 @@ async function walk(dir, base = dir) {
     if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
       files.push(...(await walk(full, base)));
-    } else if (entry.isFile() && IMAGE_EXT.has(path.extname(entry.name).toLowerCase())) {
+    } else if (
+      entry.isFile() &&
+      IMAGE_EXT.has(path.extname(entry.name).toLowerCase())
+    ) {
       files.push(path.relative(base, full));
     }
   }
@@ -108,12 +118,22 @@ async function writeJpeg(pipeline, dest, quality, mastersDir) {
   await pipeline.jpeg(jpegOptions(quality)).toFile(dest);
 }
 
+function catalogSrcs() {
+  if (!existsSync(catalogPath)) {
+    throw new Error(`Missing catalogue file: ${catalogPath}`);
+  }
+  const text = readFileSync(catalogPath, "utf8");
+  return [...text.matchAll(/src:\s*"(\/images\/[^"]+)"/g)].map((match) => match[1]);
+}
+
 function expectedOutputs(masterRels) {
   const expected = new Set();
   for (const rel of masterRels) {
     const keepRel = posixRel(outputRelFor(rel));
     expected.add(keepRel);
+    expected.add(posixRel(path.join("small", keepRel)));
     expected.add(posixRel(path.join("tile", keepRel)));
+    expected.add(posixRel(path.join("large", keepRel)));
     if (posixRel(rel) === HERO_SOURCE) {
       expected.add(posixRel(path.join("hero", "startrails.jpg")));
     }
@@ -134,7 +154,9 @@ async function processFile(mastersDir, rel) {
   }
 
   const displayDest = path.join(publicImages, keepRel);
+  const smallDest = path.join(publicImages, "small", keepRel);
   const tileDest = path.join(publicImages, "tile", keepRel);
+  const largeDest = path.join(publicImages, "large", keepRel);
 
   await writeJpeg(
     sharp(src, { failOn: "none" }).rotate().resize({
@@ -147,7 +169,17 @@ async function processFile(mastersDir, rel) {
     DISPLAY_QUALITY,
     mastersDir,
   );
-
+  await writeJpeg(
+    sharp(src, { failOn: "none" }).rotate().resize({
+      width: SMALL_EDGE,
+      height: SMALL_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    }),
+    smallDest,
+    SMALL_QUALITY,
+    mastersDir,
+  );
   await writeJpeg(
     sharp(src, { failOn: "none" }).rotate().resize({
       width: TILE_EDGE,
@@ -157,6 +189,17 @@ async function processFile(mastersDir, rel) {
     }),
     tileDest,
     TILE_QUALITY,
+    mastersDir,
+  );
+  await writeJpeg(
+    sharp(src, { failOn: "none" }).rotate().resize({
+      width: LARGE_EDGE,
+      height: LARGE_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    }),
+    largeDest,
+    LARGE_QUALITY,
     mastersDir,
   );
 
@@ -184,7 +227,9 @@ async function processFile(mastersDir, rel) {
   }
 
   const displayMeta = await sharp(displayDest).metadata();
+  const smallMeta = await sharp(smallDest).metadata();
   const tileMeta = await sharp(tileDest).metadata();
+  const largeMeta = await sharp(largeDest).metadata();
   const catalogKey = `/images/${posixRel(rel)}`;
   const displayKey = `/images/${posixRel(keepRel)}`;
 
@@ -194,15 +239,25 @@ async function processFile(mastersDir, rel) {
     entry: {
       width,
       height,
-      display: {
-        src: displayKey,
-        width: displayMeta.width ?? 0,
-        height: displayMeta.height ?? 0,
+      small: {
+        src: `/images/small/${posixRel(keepRel)}`,
+        width: smallMeta.width ?? 0,
+        height: smallMeta.height ?? 0,
       },
       tile: {
         src: `/images/tile/${posixRel(keepRel)}`,
         width: tileMeta.width ?? 0,
         height: tileMeta.height ?? 0,
+      },
+      large: {
+        src: `/images/large/${posixRel(keepRel)}`,
+        width: largeMeta.width ?? 0,
+        height: largeMeta.height ?? 0,
+      },
+      display: {
+        src: displayKey,
+        width: displayMeta.width ?? 0,
+        height: displayMeta.height ?? 0,
       },
       ...(hero ? { hero } : {}),
     },
@@ -224,9 +279,6 @@ async function pruneStale(expected) {
     if (expected.has(posix)) continue;
     const full = path.join(publicImages, rel);
     assertOutsideMasters(full, path.join(root, "masters"));
-    if (existsSync("/home/ubuntu/fatni-photography-masters")) {
-      assertOutsideMasters(full, "/home/ubuntu/fatni-photography-masters");
-    }
     await rm(full);
     removed.push(posix);
     process.stdout.write(`rm  ${posix}\n`);
@@ -248,6 +300,15 @@ async function removeEmptyDirs(dir) {
   }
 }
 
+function masterKeys(files) {
+  const keys = new Set();
+  for (const rel of files) {
+    keys.add(`/images/${posixRel(rel)}`);
+    keys.add(`/images/${posixRel(outputRelFor(rel))}`);
+  }
+  return keys;
+}
+
 async function main() {
   const mastersDir = resolveMastersDir();
   const mastersStat = await stat(mastersDir);
@@ -262,6 +323,19 @@ async function main() {
     );
   }
 
+  const catalog = catalogSrcs();
+  if (!catalog.length) {
+    throw new Error(`No photograph src values found in ${catalogPath}.`);
+  }
+
+  const generatedKeys = masterKeys(files);
+  const missing = catalog.filter((src) => !generatedKeys.has(src));
+  if (missing.length) {
+    throw new Error(
+      `Catalogue photographs have no master; refusing to generate or prune.\nMissing:\n${missing.join("\n")}`,
+    );
+  }
+
   process.stdout.write(`masters ${mastersDir} (${files.length} files)\n`);
 
   const manifest = {};
@@ -269,7 +343,10 @@ async function main() {
 
   for (const rel of files) {
     try {
-      const { catalogKey, displayKey, entry } = await processFile(mastersDir, rel);
+      const { catalogKey, displayKey, entry } = await processFile(
+        mastersDir,
+        rel,
+      );
       manifest[catalogKey] = entry;
       if (displayKey !== catalogKey) {
         manifest[displayKey] = entry;

@@ -60,6 +60,7 @@ export function PhotoGrid({
                 photo={photo}
                 index={index}
                 layout={layout}
+                priority={index < 2}
                 onOpen={setActiveIndex}
               />
             ))}

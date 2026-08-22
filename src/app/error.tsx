@@ -12,10 +12,10 @@ export default function Error({
       className="flex min-h-svh flex-col items-center justify-center bg-ink px-5 text-center"
     >
       <h1 className="font-display text-4xl italic text-paper sm:text-5xl">
-        Photographs unavailable
+        Something went wrong
       </h1>
       <p className="mt-5 max-w-md font-brand text-paper-dim">
-        The catalogue could not be loaded. Try again in a moment.
+        Please try again in a moment.
       </p>
       <button
         type="button"

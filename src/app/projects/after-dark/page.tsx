@@ -6,8 +6,6 @@ import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
-export const revalidate = 60;
-
 export const metadata: Metadata = publicPageMetadata({
   title: "After Dark",
   description:
@@ -15,16 +13,14 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/projects/after-dark",
 });
 
-export default async function AyoubAfterDarkPage() {
+export default function AyoubAfterDarkPage() {
   if (!isAyoubSite()) notFound();
-
-  const items = await getCollectionPhotos("After Dark");
 
   return (
     <>
       <Header />
       <main id="main">
-        <AfterDark items={items} />
+        <AfterDark items={getCollectionPhotos("After Dark")} />
       </main>
     </>
   );

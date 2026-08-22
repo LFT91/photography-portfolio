@@ -7,8 +7,6 @@ import { getFatniCollectionSummaries } from "@/lib/catalog";
 import { FATNI_WORK_DESCRIPTION, publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
-export const revalidate = 60;
-
 export const metadata: Metadata = publicPageMetadata({
   title: isAyoubSite() ? "After Dark" : "Collections",
   description: isAyoubSite()
@@ -17,12 +15,12 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/work",
 });
 
-export default async function WorkPage() {
+export default function WorkPage() {
   if (isAyoubSite()) {
     redirect("/projects/after-dark");
   }
 
-  const collections = await getFatniCollectionSummaries();
+  const collections = getFatniCollectionSummaries();
 
   return (
     <>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PhotoImage } from "@/components/PhotoImage";
-import type { FatniCollectionSummary } from "@/lib/fatni-collections";
+import type { FatniCollectionSummary } from "@/lib/catalog";
 
 type CollectionIndexProps = {
   collections: FatniCollectionSummary[];

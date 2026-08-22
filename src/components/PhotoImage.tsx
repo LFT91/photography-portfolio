@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { variantsFor, type ImageVariant } from "@/lib/image";
+import { gridSrcSet, variantsFor, type ImageVariant } from "@/lib/image";
 
 type PhotoImageProps = {
   src: string;
@@ -33,11 +33,10 @@ export function PhotoImage({
   fill = false,
 }: PhotoImageProps) {
   const chosen = pickVariant(src, variant);
-  const variants = variantsFor(src);
   const srcSet =
-    variant === "hero" || src.startsWith("blob:") || src.startsWith("data:")
-      ? undefined
-      : `${variants.tile.src} ${variants.tile.width ?? 800}w, ${variants.display.src} ${variants.display.width ?? 1800}w`;
+    variant === "tile" && !src.startsWith("blob:") && !src.startsWith("data:")
+      ? gridSrcSet(src)
+      : undefined;
 
   const mergedStyle: CSSProperties | undefined = fill
     ? {

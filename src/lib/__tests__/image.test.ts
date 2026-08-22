@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import manifest from "../../data/image-manifest.json";
+import { photos } from "../../content/photos";
 import {
   DISPLAY_WIDTH,
   TILE_WIDTH,
+  gridSrcSet,
   heroImage,
   localImagePath,
-  supabaseRenderUrl,
   variantsFor,
 } from "../image";
+
+const ROOT = path.resolve(import.meta.dirname, "../../..");
 
 describe("localImagePath", () => {
   it("keeps site-relative image paths", () => {
@@ -17,61 +23,49 @@ describe("localImagePath", () => {
     );
   });
 
-  it("extracts /images paths from the Fatni and Vercel hosts", () => {
-    assert.equal(
-      localImagePath(
-        "https://fatni-photography.vercel.app/images/nature/sea-stacks.jpg",
-      ),
-      "/images/nature/sea-stacks.jpg",
-    );
-    assert.equal(
-      localImagePath(
-        "https://www.fatniphotography.com/images/nature/sea-stacks.jpg",
-      ),
-      "/images/nature/sea-stacks.jpg",
-    );
-  });
-
-  it("ignores supabase object URLs", () => {
-    assert.equal(
-      localImagePath(
-        "https://example.supabase.co/storage/v1/object/public/photos/abc.jpg",
-      ),
-      null,
-    );
+  it("rejects remote URLs", () => {
+    assert.equal(localImagePath("https://example.com/images/x.jpg"), null);
   });
 });
 
 describe("variantsFor", () => {
-  it("maps a local master path to tile and display derivatives", () => {
+  it("maps a local path to tile and display derivatives", () => {
     const variants = variantsFor("/images/after-dark/startrails.jpg");
     assert.equal(variants.tile.src, "/images/tile/after-dark/startrails.jpg");
     assert.equal(variants.display.src, "/images/after-dark/startrails.jpg");
-    assert.ok((variants.tile.width ?? 0) <= 800);
-    assert.ok((variants.display.width ?? 0) <= 1800);
+    assert.ok((variants.tile.width ?? 0) <= TILE_WIDTH);
+    assert.ok((variants.display.width ?? 0) <= DISPLAY_WIDTH);
   });
 
-  it("rewrites supabase object URLs to the render API", () => {
-    const src =
-      "https://eisupstzytkhpxbhjjdz.supabase.co/storage/v1/object/public/photos/abc.jpg";
-    const variants = variantsFor(src);
-    assert.equal(
-      variants.tile.src,
-      supabaseRenderUrl(src, TILE_WIDTH),
-    );
-    assert.equal(
-      variants.display.src,
-      supabaseRenderUrl(src, DISPLAY_WIDTH),
-    );
-    assert.match(variants.tile.src, /\/render\/image\/public\/photos\/abc.jpg/);
-    assert.match(variants.tile.src, /width=800/);
+  it("never puts the 1800px display file in the gallery srcset", () => {
+    const srcset = gridSrcSet("/images/after-dark/startrails.jpg");
+    assert.ok(srcset);
+    assert.equal(srcset.includes("/images/after-dark/startrails.jpg"), false);
+    assert.equal(srcset.includes("1800w"), false);
+    assert.match(srcset, /\/images\/tile\/after-dark\/startrails\.jpg/);
   });
 });
 
 describe("heroImage", () => {
-  it("uses the dedicated hero derivative, not the master", () => {
+  it("uses the dedicated hero derivative", () => {
     const hero = heroImage();
     assert.equal(hero.src, "/images/hero/startrails.jpg");
     assert.ok((hero.width ?? 0) <= 1600);
+  });
+});
+
+describe("manifest consistency", () => {
+  it("has a manifest entry and tile file for every catalogue photograph", () => {
+    for (const photo of Object.values(photos)) {
+      const entry = (manifest as Record<string, { tile: { src: string } }>)[
+        photo.src
+      ];
+      assert.ok(entry, `missing manifest ${photo.src}`);
+      assert.equal(
+        existsSync(path.join(ROOT, "public", entry.tile.src)),
+        true,
+        entry.tile.src,
+      );
+    }
   });
 });

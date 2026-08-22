@@ -1,7 +1,10 @@
 import manifest from "@/data/image-manifest.json";
 
+export const SMALL_WIDTH = 480;
 export const TILE_WIDTH = 800;
+export const LARGE_WIDTH = 1200;
 export const DISPLAY_WIDTH = 1800;
+export const HERO_WIDTH = 1600;
 
 export type ImageVariant = {
   src: string;
@@ -10,7 +13,9 @@ export type ImageVariant = {
 };
 
 export type ImageVariants = {
+  small?: ImageVariant;
   tile: ImageVariant;
+  large?: ImageVariant;
   display: ImageVariant;
   hero?: ImageVariant;
 };
@@ -18,83 +23,19 @@ export type ImageVariants = {
 type ManifestEntry = {
   width: number;
   height: number;
-  display: { src: string; width: number; height: number };
+  small?: { src: string; width: number; height: number };
   tile: { src: string; width: number; height: number };
+  large?: { src: string; width: number; height: number };
+  display: { src: string; width: number; height: number };
   hero?: { src: string; width: number; height: number };
 };
 
 const IMAGE_MANIFEST = manifest as Record<string, ManifestEntry>;
 
-const LOCAL_PREFIXES = [
-  "https://www.fatniphotography.com",
-  "https://fatniphotography.com",
-  "https://fatni-photography.vercel.app",
-];
-
 export function localImagePath(src: string): string | null {
   if (!src) return null;
   if (src.startsWith("/images/")) return src.split("?")[0];
-
-  try {
-    const url = new URL(src);
-    if (!url.pathname.startsWith("/images/")) return null;
-    if (
-      LOCAL_PREFIXES.includes(url.origin) ||
-      url.hostname.endsWith(".vercel.app")
-    ) {
-      return url.pathname.split("?")[0];
-    }
-  } catch {
-    const index = src.indexOf("/images/");
-    if (index >= 0) return src.slice(index).split("?")[0];
-  }
-
   return null;
-}
-
-export function supabaseObjectPath(src: string): string | null {
-  try {
-    const url = new URL(src);
-    if (!url.hostname.endsWith(".supabase.co")) return null;
-    const marker = "/storage/v1/object/public/";
-    const index = url.pathname.indexOf(marker);
-    if (index < 0) return null;
-    return url.pathname.slice(index + marker.length);
-  } catch {
-    return null;
-  }
-}
-
-export function supabaseRenderUrl(src: string, width: number): string | null {
-  try {
-    const url = new URL(src);
-    if (!url.hostname.endsWith(".supabase.co")) return null;
-
-    const objectMarker = "/storage/v1/object/public/";
-    const renderMarker = "/storage/v1/render/image/public/";
-    let rest: string | null = null;
-
-    if (url.pathname.includes(objectMarker)) {
-      rest = url.pathname.slice(
-        url.pathname.indexOf(objectMarker) + objectMarker.length,
-      );
-    } else if (url.pathname.includes(renderMarker)) {
-      rest = url.pathname.slice(
-        url.pathname.indexOf(renderMarker) + renderMarker.length,
-      );
-    }
-
-    if (!rest) return null;
-
-    url.pathname = `${renderMarker}${rest}`;
-    url.search = "";
-    url.searchParams.set("width", String(width));
-    url.searchParams.set("resize", "contain");
-    url.searchParams.set("quality", width <= TILE_WIDTH ? "75" : "80");
-    return url.toString();
-  } catch {
-    return null;
-  }
 }
 
 function manifestEntry(src: string): ManifestEntry | null {
@@ -111,19 +52,29 @@ export function variantsFor(src: string): ImageVariants {
   const entry = manifestEntry(src);
   if (entry) {
     return {
+      small: entry.small,
       tile: entry.tile,
+      large: entry.large,
       display: entry.display,
       hero: entry.hero,
     };
   }
 
-  const tile = supabaseRenderUrl(src, TILE_WIDTH);
-  const display = supabaseRenderUrl(src, DISPLAY_WIDTH);
-  if (tile && display) {
-    return { tile: { src: tile }, display: { src: display } };
-  }
-
   return { tile: { src }, display: { src } };
+}
+
+/** Gallery tiles: 480 / 800 / 1200 only. Never include the 1800 lightbox file. */
+export function gridSrcSet(src: string): string | undefined {
+  const variants = variantsFor(src);
+  const parts: string[] = [];
+  if (variants.small?.src) {
+    parts.push(`${variants.small.src} ${variants.small.width ?? SMALL_WIDTH}w`);
+  }
+  parts.push(`${variants.tile.src} ${variants.tile.width ?? TILE_WIDTH}w`);
+  if (variants.large?.src) {
+    parts.push(`${variants.large.src} ${variants.large.width ?? LARGE_WIDTH}w`);
+  }
+  return parts.length ? parts.join(", ") : undefined;
 }
 
 export function heroImage(): ImageVariant {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { fatniArchiveCollections } from "@/lib/fatni-collections";
+import { FATNI_COLLECTION_DEFS } from "@/content/collections";
 import {
   FATNI_PUBLIC_URL,
   FATNI_SITE_NAME,
@@ -109,7 +109,7 @@ export function publicSitemapPaths(): string[] {
   return [
     "/",
     "/work",
-    ...fatniArchiveCollections().map((collection) => collection.href),
+    ...FATNI_COLLECTION_DEFS.map((collection) => collection.href),
     "/about",
     "/contact",
   ];

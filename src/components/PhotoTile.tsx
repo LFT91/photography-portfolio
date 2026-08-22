@@ -12,11 +12,13 @@ export function PhotoTile({
   photo,
   index,
   layout,
+  priority = false,
   onOpen,
 }: {
   photo: Photo;
   index: number;
   layout: "fatni" | "ayoub";
+  priority?: boolean;
   onOpen: (index: number) => void;
 }) {
   const ayoub = layout === "ayoub";
@@ -48,6 +50,7 @@ export function PhotoTile({
             src={photo.src}
             alt={photo.title}
             variant="tile"
+            priority={priority}
             sizes={
               ayoub
                 ? "(max-width: 768px) 100vw, 580px"

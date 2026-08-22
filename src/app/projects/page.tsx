@@ -7,18 +7,16 @@ import { getCollectionPhotos } from "@/lib/catalog";
 import { publicPageMetadata } from "@/lib/seo";
 import { isAyoubSite } from "@/lib/site";
 
-export const revalidate = 60;
-
 export const metadata: Metadata = publicPageMetadata({
   title: "Projects",
   description: "Photographic projects by Ayoub El Fatni.",
   path: "/projects",
 });
 
-export default async function ProjectsPage() {
+export default function ProjectsPage() {
   if (!isAyoubSite()) notFound();
 
-  const afterDark = await getCollectionPhotos("After Dark");
+  const afterDark = getCollectionPhotos("After Dark");
   const count = afterDark.length;
 
   return (

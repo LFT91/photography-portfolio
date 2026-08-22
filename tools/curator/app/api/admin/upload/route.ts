@@ -6,6 +6,7 @@ import { addToCollection, cloneDraft } from "@/lib/admin/draft";
 import { ensureMastersDir } from "@/lib/admin/masters";
 import { allocatePhotoId } from "@/lib/admin/photo-id";
 import { readCatalogFromDisk } from "@/lib/admin/catalog-writer";
+import { repoRoot } from "@/lib/admin/repo";
 import { UPLOAD_FOLDER } from "@/lib/admin/shape";
 import {
   forbiddenOrNull,
@@ -17,7 +18,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"]);
-const root = process.cwd();
+const root = repoRoot();
 const manifestPath = join(root, "src", "data", "image-manifest.json");
 const publicImages = join(root, "public", "images");
 

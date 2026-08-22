@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { repoRoot } from "@/lib/admin/repo";
 import { join, resolve, sep } from "node:path";
 
 export const DEFAULT_MASTERS_LABEL = "~/Pictures/Fatni Photography Masters";
@@ -42,7 +43,7 @@ export function resolveMastersDir({
   return { dir: resolve(defaultMastersDir(home)), fromEnv: false };
 }
 
-export function isInsideRepo(dir: string, projectRoot = process.cwd()) {
+export function isInsideRepo(dir: string, projectRoot = repoRoot()) {
   const resolved = resolve(dir);
   const root = resolve(projectRoot);
   const prefix = root.endsWith(sep) ? root : `${root}${sep}`;
@@ -51,7 +52,7 @@ export function isInsideRepo(dir: string, projectRoot = process.cwd()) {
 
 export function getMastersStatus({
   env = process.env as { MASTERS_DIR?: string },
-  projectRoot = process.cwd(),
+  projectRoot = repoRoot(),
   home = homedir(),
 }: MastersOptions = {}): MastersStatus {
   const { dir, fromEnv } = resolveMastersDir({ env, home });
@@ -93,7 +94,7 @@ export function ensureMastersDir(options: MastersOptions = {}): MastersStatus {
       };
     }
     const real = realpathSync(status.dir);
-    if (isInsideRepo(real, options.projectRoot ?? process.cwd())) {
+    if (isInsideRepo(real, options.projectRoot ?? repoRoot())) {
       return {
         ok: false,
         reason:

@@ -9,7 +9,7 @@ import { collections } from "@/content/collections";
 import { photos } from "@/content/photos";
 
 export const metadata: Metadata = {
-  title: { absolute: "Local curator" },
+  title: { absolute: "Photography Curator" },
   robots: { index: false, follow: false },
 };
 

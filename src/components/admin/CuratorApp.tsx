@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { AddPhotograph } from "@/components/admin/AddPhotograph";
-import { CollectionBoard } from "@/components/admin/CollectionBoard";
-import { PhotoLibrary } from "@/components/admin/PhotoLibrary";
-import { CuratorThumb } from "@/components/admin/CuratorThumb";
+import { CuratorInspector } from "@/components/admin/CuratorInspector";
+import { CuratorSidebar, type CuratorView } from "@/components/admin/CuratorSidebar";
+import { CuratorWorkspace } from "@/components/admin/CuratorWorkspace";
 import {
   addToCollection,
   draftSnapshot,
@@ -14,17 +14,13 @@ import {
   unassignedIds,
   updatePhoto,
 } from "@/lib/admin/draft";
-import type { CatalogDraft, CuratorCollection, CuratorPhoto } from "@/lib/admin/types";
+import type { CatalogDraft, CuratorCollection } from "@/lib/admin/types";
+import type { PhotoDragPayload } from "@/components/admin/photo-drag";
 
 export type CuratorPayload = CatalogDraft & {
   unassignedIds: string[];
   canUpload: boolean;
   uploadDisabledReason: string | null;
-};
-
-type DragPayload = {
-  photoId: string;
-  fromCollectionId: string | null;
 };
 
 export function CuratorApp({ initial }: { initial: CuratorPayload }) {
@@ -34,19 +30,37 @@ export function CuratorApp({ initial }: { initial: CuratorPayload }) {
     draftSnapshot({ photos: initial.photos, collections: initial.collections }),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<CuratorView>({ kind: "all" });
   const [status, setStatus] = useState<"saved" | "dirty">("saved");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [readyNote, setReadyNote] = useState<string | null>(null);
 
-  const dirty =
-    draftSnapshot({ photos, collections }) !== saved;
+  const dirty = draftSnapshot({ photos, collections }) !== saved;
   const photosById = useMemo(
     () => new Map(photos.map((photo) => [photo.id, photo])),
     [photos],
   );
-  const selected = selectedId ? photosById.get(selectedId) : null;
+  const selected = selectedId ? (photosById.get(selectedId) ?? null) : null;
   const unassigned = unassignedIds(photos, collections);
+  const currentCollection =
+    view.kind === "collection"
+      ? (collections.find((item) => item.id === view.id) ?? null)
+      : null;
+
+  const workspaceIds =
+    view.kind === "all"
+      ? photos.map((photo) => photo.id)
+      : view.kind === "unassigned"
+        ? unassigned
+        : (currentCollection?.photoIds ?? []);
+
+  const workspaceTitle =
+    view.kind === "all"
+      ? "All photographs"
+      : view.kind === "unassigned"
+        ? "Unassigned"
+        : (currentCollection?.title ?? "Collection");
 
   const applyCollections = (next: CuratorCollection[]) => {
     setCollections(next);
@@ -114,9 +128,9 @@ export function CuratorApp({ initial }: { initial: CuratorPayload }) {
     setReadyNote(`Not ready: ${failed.join(", ") || "checks failed"}.`);
   };
 
-  const onDropPhoto = (
+  const onDropOnCollection = (
     collectionId: string,
-    payload: DragPayload,
+    payload: PhotoDragPayload,
     index: number,
     add: boolean,
   ) => {
@@ -148,168 +162,164 @@ export function CuratorApp({ initial }: { initial: CuratorPayload }) {
   };
 
   return (
-    <div className="flex min-h-svh flex-col bg-ink text-paper">
-      <header className="border-b border-line px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-brand text-[11px] tracking-[0.14em] text-fog uppercase">
-              Local curator · localhost only
-            </p>
-            <h1 className="font-display text-3xl italic">Catalogue</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p
-              className={`font-brand text-xs tracking-[0.08em] ${
-                dirty ? "text-ember" : "text-fog"
-              }`}
-            >
-              {busy ? "Working…" : dirty ? "Unsaved" : "Saved"}
-            </p>
-            <button
-              type="button"
-              disabled={!dirty || busy}
-              onClick={() => void save()}
-              className="border border-paper px-3 py-1.5 font-brand text-sm text-paper disabled:opacity-40"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              disabled={busy || dirty}
-              onClick={() => void checkReady()}
-              className="border border-line px-3 py-1.5 font-brand text-sm text-paper disabled:opacity-40"
-            >
-              Ready to publish
-            </button>
-            <AddPhotograph
-              collections={collections}
-              disabledReason={
-                initial.canUpload ? null : initial.uploadDisabledReason
-              }
-              onUploaded={(payload) => {
-                applyPayload(payload as CuratorPayload);
-                setMessage("Photograph added to the local catalogue.");
-              }}
-            />
-          </div>
+    <div className="curator flex flex-col">
+      <header className="curator-header">
+        <div className="curator-brand">
+          <h1 className="curator-title">Photography Curator</h1>
+          <p className="curator-localhost">localhost only</p>
         </div>
-        {message ? (
-          <p className="mt-2 font-brand text-sm text-fog">{message}</p>
-        ) : null}
-        {readyNote ? (
-          <p className="mt-1 font-brand text-sm text-fog">{readyNote}</p>
-        ) : null}
-        <p className="mt-2 max-w-3xl font-brand text-xs leading-relaxed text-fog">
-          Drag within a collection to reorder. Drag between collections to move.
-          Hold Option/Alt while dropping to add without removing the original
-          membership. Save writes src/content files only — it does not push to
-          GitHub.
-        </p>
+        <div className="curator-header-actions">
+          <p
+            className={`curator-save-state${dirty ? " is-dirty" : " is-ok"}`}
+          >
+            {busy ? "Working" : dirty ? "Unsaved" : "Saved"}
+          </p>
+          <button
+            type="button"
+            disabled={!dirty || busy}
+            onClick={() => void save()}
+            className="curator-btn curator-btn-primary"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            disabled={busy || dirty}
+            onClick={() => void checkReady()}
+            className="curator-btn"
+          >
+            Ready to publish
+          </button>
+          <AddPhotograph
+            collections={collections}
+            disabledReason={
+              initial.canUpload ? null : initial.uploadDisabledReason
+            }
+            onUploaded={(payload) => {
+              applyPayload(payload as CuratorPayload);
+              setMessage("Photograph added to the local catalogue.");
+            }}
+          />
+          {initial.canUpload ? null : (
+            <p className="curator-hint">Master folder needs setup</p>
+          )}
+        </div>
       </header>
+      {message || readyNote ? (
+        <div className="curator-status">
+          {message ? <p>{message}</p> : null}
+          {readyNote ? <p>{readyNote}</p> : null}
+        </div>
+      ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[20rem_minmax(0,1fr)_18rem]">
-        <PhotoLibrary
-          photos={photos}
-          unassignedIds={unassigned}
+      <div className="curator-shell">
+        <CuratorSidebar
+          photosCount={photos.length}
+          unassignedCount={unassigned.length}
+          collections={collections}
+          view={view}
+          onView={setView}
+          onDropPhoto={(collectionId, payload, add) => {
+            if (payload.fromCollectionId === collectionId && !add) return;
+            onDropOnCollection(
+              collectionId,
+              payload,
+              collections.find((item) => item.id === collectionId)?.photoIds
+                .length ?? 0,
+              add,
+            );
+          }}
+        />
+
+        <CuratorWorkspace
+          title={workspaceTitle}
+          count={workspaceIds.length}
+          photoIds={workspaceIds}
+          photosById={photosById}
           collections={collections}
           selectedId={selectedId}
+          collectionId={currentCollection?.id ?? null}
+          canReorder={view.kind === "collection"}
           onSelect={setSelectedId}
-          onAddToCollection={(photoId, collectionId) =>
-            applyCollections(addToCollection(collections, collectionId, photoId))
+          onReorder={(from, to) => {
+            if (!currentCollection) return;
+            applyCollections(
+              reorderInCollection(collections, currentCollection.id, from, to),
+            );
+          }}
+          onDropPhoto={(payload, index, add) => {
+            if (!currentCollection) return;
+            onDropOnCollection(currentCollection.id, payload, index, add);
+          }}
+          onRemove={(photoId) => {
+            if (!currentCollection) return;
+            applyCollections(
+              removeFromCollection(collections, currentCollection.id, photoId),
+            );
+          }}
+          onMove={(photoId, toCollectionId) => {
+            if (!currentCollection) return;
+            applyCollections(
+              moveToCollection(
+                collections,
+                photoId,
+                currentCollection.id,
+                toCollectionId,
+              ),
+            );
+          }}
+          onAdd={(photoId, toCollectionId) =>
+            applyCollections(
+              addToCollection(collections, toCollectionId, photoId),
+            )
+          }
+          emptyLabel={
+            view.kind === "unassigned"
+              ? "Every photograph is in a collection."
+              : view.kind === "all"
+                ? "No photographs in the catalogue."
+                : undefined
           }
         />
 
-        <div className="flex min-w-0 gap-3 overflow-x-auto pb-2">
-          {collections.map((collection) => (
-            <CollectionBoard
-              key={collection.id}
-              collection={collection}
-              collections={collections}
-              photosById={photosById}
-              onReorder={(from, to) =>
-                applyCollections(
-                  reorderInCollection(collections, collection.id, from, to),
-                )
-              }
-              onDropPhoto={(payload, index, add) =>
-                onDropPhoto(collection.id, payload, index, add)
-              }
-              onRemove={(photoId) =>
-                applyCollections(
-                  removeFromCollection(collections, collection.id, photoId),
-                )
-              }
-              onMove={(photoId, toCollectionId) =>
-                applyCollections(
-                  moveToCollection(
-                    collections,
-                    photoId,
-                    collection.id,
-                    toCollectionId,
-                  ),
-                )
-              }
-              onAdd={(photoId, toCollectionId) =>
-                applyCollections(
-                  addToCollection(collections, toCollectionId, photoId),
-                )
-              }
-            />
-          ))}
-        </div>
-
-        <aside className="border border-line bg-ink-soft/30 p-3">
-          <h2 className="font-display text-xl italic">Photograph</h2>
-          {selected ? (
-            <div className="mt-3 space-y-3">
-              <div className="max-h-64 overflow-hidden">
-                <CuratorThumb photo={selected as CuratorPhoto} className="max-h-64 object-contain" />
-              </div>
-              <label className="block font-brand text-sm text-fog">
-                Title
-                <input
-                  value={selected.title}
-                  onChange={(event) => {
-                    setPhotos(
-                      updatePhoto(photos, selected.id, {
-                        title: event.target.value,
-                      }),
-                    );
-                    setStatus("dirty");
-                  }}
-                  className="mt-1 w-full border border-line bg-transparent px-2 py-1 text-paper"
-                />
-              </label>
-              <label className="block font-brand text-sm text-fog">
-                displayScale
-                <input
-                  type="number"
-                  min={0.45}
-                  max={3}
-                  step={0.01}
-                  value={selected.displayScale ?? 1}
-                  onChange={(event) => {
-                    const value = Number.parseFloat(event.target.value);
-                    setPhotos(
-                      updatePhoto(photos, selected.id, {
-                        displayScale: Number.isFinite(value) ? value : 1,
-                      }),
-                    );
-                    setStatus("dirty");
-                  }}
-                  className="mt-1 w-full border border-line bg-transparent px-2 py-1 text-paper"
-                />
-              </label>
-              <p className="break-all font-brand text-[11px] text-fog">
-                {selected.id}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-3 font-brand text-sm text-fog">
-              Select a photograph in the library to edit title and displayScale.
-            </p>
-          )}
-        </aside>
+        <CuratorInspector
+          photo={selected}
+          collections={collections}
+          currentCollectionId={currentCollection?.id ?? null}
+          onTitle={(title) => {
+            if (!selected) return;
+            setPhotos(updatePhoto(photos, selected.id, { title }));
+            setStatus("dirty");
+          }}
+          onDisplayScale={(displayScale) => {
+            if (!selected) return;
+            setPhotos(updatePhoto(photos, selected.id, { displayScale }));
+            setStatus("dirty");
+          }}
+          onAdd={(collectionId) => {
+            if (!selected) return;
+            applyCollections(
+              addToCollection(collections, collectionId, selected.id),
+            );
+          }}
+          onMove={(collectionId) => {
+            if (!selected || !currentCollection) return;
+            applyCollections(
+              moveToCollection(
+                collections,
+                selected.id,
+                currentCollection.id,
+                collectionId,
+              ),
+            );
+          }}
+          onRemoveFrom={(collectionId) => {
+            if (!selected) return;
+            applyCollections(
+              removeFromCollection(collections, collectionId, selected.id),
+            );
+          }}
+        />
       </div>
       <span className="sr-only">{status}</span>
     </div>

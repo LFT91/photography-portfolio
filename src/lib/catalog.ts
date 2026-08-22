@@ -1,5 +1,5 @@
 import { collections, FATNI_COLLECTION_DEFS } from "@/content/collections";
-import { photos, type CatalogPhotoId } from "@/content/photos";
+import { photos, type CatalogPhotoId, type PhotoRecord } from "@/content/photos";
 import type { Photo, PhotoCategory } from "@/lib/photo";
 import { isAyoubSite, isFatniSite } from "@/lib/site";
 
@@ -11,7 +11,7 @@ export type FatniCollectionSummary = {
   cover: { src: string; title: string } | null;
 };
 
-function record(id: string) {
+function record(id: string): PhotoRecord {
   if (!(id in photos)) {
     throw new Error(`Unknown photograph: ${id}`);
   }

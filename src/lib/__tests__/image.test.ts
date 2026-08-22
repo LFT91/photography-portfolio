@@ -13,7 +13,7 @@ import {
   variantsFor,
 } from "../image";
 
-const ROOT = path.resolve(import.meta.dirname, "../../..");
+const ROOT = process.cwd();
 
 describe("localImagePath", () => {
   it("keeps site-relative image paths", () => {

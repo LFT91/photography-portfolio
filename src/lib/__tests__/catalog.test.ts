@@ -6,7 +6,7 @@ import { collections } from "../../content/collections";
 import { photos } from "../../content/photos";
 import { getCollectionPhotos, getFatniCollectionSummaries } from "../catalog";
 
-const ROOT = path.resolve(import.meta.dirname, "../../..");
+const ROOT = process.cwd();
 
 const EXPECTED_COUNTS = {
   "fatni.nature": 35,
@@ -151,14 +151,14 @@ describe("catalogue integrity", () => {
   });
 
   it("does not share photographs across brands", () => {
-    const fatni = new Set([
+    const fatni = new Set<string>([
       ...collections.fatni.nature,
       ...collections.fatni.urban,
       ...collections.fatni.astro,
       ...collections.fatni.street,
       ...collections.fatni.monochrome,
     ]);
-    const ayoub = new Set([
+    const ayoub = new Set<string>([
       ...collections.ayoub.afterDark,
       ...collections.ayoub.monochrome,
     ]);

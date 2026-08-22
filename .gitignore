@@ -43,6 +43,7 @@ yarn-error.log*
 # local / generated scratch
 .after-dark-scan/
 tmp/
+*.tmp
 
 # Camera originals — keep outside Git. See masters/README.md
 /masters/images/

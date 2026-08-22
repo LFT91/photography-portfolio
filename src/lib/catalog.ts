@@ -67,3 +67,21 @@ export function getFatniCollectionSummaries(): FatniCollectionSummary[] {
     };
   });
 }
+
+export function allMembershipIds(): string[] {
+  return [
+    ...collections.fatni.nature,
+    ...collections.fatni.urban,
+    ...collections.fatni.astro,
+    ...collections.fatni.street,
+    ...collections.fatni.monochrome,
+    ...collections.ayoub.afterDark,
+    ...collections.ayoub.monochrome,
+  ];
+}
+
+/** Photograph IDs in the catalogue that are not in any public collection. */
+export function unassignedPhotoIds(): string[] {
+  const assigned = new Set(allMembershipIds());
+  return Object.keys(photos).filter((id) => !assigned.has(id));
+}

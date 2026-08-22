@@ -17,12 +17,18 @@
  * If any public catalogue photograph has no master, the run fails
  * before pruning.
  *
- * Usage: MASTERS_DIR=/path/to/masters/images npm run images
+ * Usage:
+ *   MASTERS_DIR=/path/to/masters/images npm run images
+ *   MASTERS_DIR=/path/to/masters/images node scripts/generate-images.mjs --file nature/coastal-moon.jpg
+ *
+ * --file generates one photograph with the same processing as a full run.
+ * It never prunes unrelated files.
  */
 
 import {
   mkdir,
   readdir,
+  rename,
   rm,
   stat,
   writeFile,
@@ -309,7 +315,80 @@ function masterKeys(files) {
   return keys;
 }
 
+function parseArgs(argv) {
+  const args = argv.slice(2);
+  if (args.length === 0) return { mode: "all" };
+  if (args[0] === "--help" || args[0] === "-h") return { mode: "help" };
+  if (args[0] === "--file") {
+    const file = args[1]?.trim();
+    if (!file || args.length !== 2) {
+      throw new Error(
+        "Usage: node scripts/generate-images.mjs --file <relative-master-path>",
+      );
+    }
+    return { mode: "one", file };
+  }
+  throw new Error(
+    `Unknown arguments: ${args.join(" ")}. Use no args for a full run, or --file <rel>.`,
+  );
+}
+
+async function writeManifestAtomic(manifest) {
+  const tmp = `${manifestPath}.tmp`;
+  await writeFile(tmp, `${JSON.stringify(manifest, null, 2)}\n`);
+  await rename(tmp, manifestPath);
+}
+
+function readManifest() {
+  if (!existsSync(manifestPath)) return {};
+  return JSON.parse(readFileSync(manifestPath, "utf8"));
+}
+
+async function generateOne(rel) {
+  const mastersDir = resolveMastersDir();
+  const mastersStat = await stat(mastersDir);
+  if (!mastersStat.isDirectory()) {
+    throw new Error(`MASTERS_DIR is not a directory: ${mastersDir}`);
+  }
+
+  const posix = posixRel(rel);
+  const src = path.join(mastersDir, posix);
+  if (!existsSync(src)) {
+    throw new Error(`Master not found: ${src}`);
+  }
+
+  const { catalogKey, displayKey, entry } = await processFile(
+    mastersDir,
+    posix,
+  );
+  const manifest = readManifest();
+  manifest[catalogKey] = entry;
+  if (displayKey !== catalogKey) {
+    manifest[displayKey] = entry;
+  }
+
+  assertOutsideMasters(manifestPath, mastersDir);
+  await mkdir(path.dirname(manifestPath), { recursive: true });
+  await writeManifestAtomic(manifest);
+
+  process.stdout.write(
+    `ok  ${posix}\nWrote 1 photograph, ${Object.keys(manifest).length} manifest keys, ${manifestPath}\n`,
+  );
+}
+
 async function main() {
+  const parsed = parseArgs(process.argv);
+  if (parsed.mode === "help") {
+    process.stdout.write(
+      "Usage:\n  npm run images\n  node scripts/generate-images.mjs --file <relative-master-path>\n",
+    );
+    return;
+  }
+  if (parsed.mode === "one") {
+    await generateOne(parsed.file);
+    return;
+  }
+
   const mastersDir = resolveMastersDir();
   const mastersStat = await stat(mastersDir);
   if (!mastersStat.isDirectory()) {
@@ -368,7 +447,7 @@ async function main() {
 
   assertOutsideMasters(manifestPath, mastersDir);
   await mkdir(path.dirname(manifestPath), { recursive: true });
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeManifestAtomic(manifest);
 
   const expected = expectedOutputs(files);
   const removed = await pruneStale(expected);

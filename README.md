@@ -38,6 +38,16 @@ npm run dev
 
 `NEXT_PUBLIC_SITE_ID` selects the brand. Omit it to work on Fatni.
 
+Local curation (not available in production):
+
+```bash
+npm run curate
+```
+
+That starts the development server on `127.0.0.1` and enables `/admin`. Ordinary `npm run dev` and production builds do not. Save writes `src/content/photos.ts` and `src/content/collections.ts` only — it never pushes to GitHub.
+
+Add Photograph needs `MASTERS_DIR` in `.env.local` pointing at an existing folder **outside Git**. Originals are copied there; web derivatives use the same generator as `npm run images`.
+
 ```bash
 npm run lint
 npm run typecheck

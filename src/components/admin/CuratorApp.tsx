@@ -19,8 +19,7 @@ import type { PhotoDragPayload } from "@/components/admin/photo-drag";
 
 export type CuratorPayload = CatalogDraft & {
   unassignedIds: string[];
-  canUpload: boolean;
-  uploadDisabledReason: string | null;
+  mastersArchiveLabel: string;
 };
 
 export function CuratorApp({ initial }: { initial: CuratorPayload }) {
@@ -192,17 +191,12 @@ export function CuratorApp({ initial }: { initial: CuratorPayload }) {
           </button>
           <AddPhotograph
             collections={collections}
-            disabledReason={
-              initial.canUpload ? null : initial.uploadDisabledReason
-            }
+            mastersArchiveLabel={initial.mastersArchiveLabel}
             onUploaded={(payload) => {
               applyPayload(payload as CuratorPayload);
               setMessage("Photograph added to the local catalogue.");
             }}
           />
-          {initial.canUpload ? null : (
-            <p className="curator-hint">Master folder needs setup</p>
-          )}
         </div>
       </header>
       {message || readyNote ? (

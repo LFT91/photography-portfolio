@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { readCatalogFromDisk } from "../admin/catalog-writer";
 import {
@@ -10,6 +13,13 @@ import {
   updatePhoto,
 } from "../admin/draft";
 import { isLocalCuratorEnabled, isLoopbackHost } from "../admin/guard";
+import {
+  DEFAULT_MASTERS_LABEL,
+  displayMastersPath,
+  ensureMastersDir,
+  getMastersStatus,
+  resolveMastersDir,
+} from "../admin/masters";
 import { allocatePhotoId } from "../admin/photo-id";
 import { collectionsToCurator, photosToCurator } from "../admin/shape";
 import { validateCatalog } from "../admin/validate";
@@ -172,5 +182,53 @@ describe("on-disk catalogue", () => {
       draft.collections.map((item) => item.photoIds),
       fromModules.collections.map((item) => item.photoIds),
     );
+  });
+});
+
+describe("master archive", () => {
+  it("defaults to Pictures/Fatni Photography Masters when MASTERS_DIR is unset", () => {
+    const { dir, fromEnv } = resolveMastersDir({
+      env: {},
+      home: "/Users/photographer",
+    });
+    assert.equal(fromEnv, false);
+    assert.equal(
+      dir,
+      resolve("/Users/photographer/Pictures/Fatni Photography Masters"),
+    );
+    assert.equal(
+      displayMastersPath(dir, "/Users/photographer"),
+      DEFAULT_MASTERS_LABEL,
+    );
+  });
+
+  it("uses MASTERS_DIR as an override", () => {
+    const { dir, fromEnv } = resolveMastersDir({
+      env: { MASTERS_DIR: "/Volumes/Archive/masters" },
+      home: "/Users/photographer",
+    });
+    assert.equal(fromEnv, true);
+    assert.equal(dir, resolve("/Volumes/Archive/masters"));
+  });
+
+  it("refuses a master archive inside the repository", () => {
+    const status = getMastersStatus({
+      env: { MASTERS_DIR: process.cwd() },
+      projectRoot: process.cwd(),
+    });
+    assert.equal(status.ok, false);
+  });
+
+  it("creates a missing archive outside the repository", () => {
+    const home = mkdtempSync(join(tmpdir(), "fatni-home-"));
+    const status = ensureMastersDir({
+      env: {},
+      home,
+      projectRoot: process.cwd(),
+    });
+    assert.equal(status.ok, true);
+    if (!status.ok) return;
+    assert.equal(existsSync(status.dir), true);
+    assert.match(status.dir, /Fatni Photography Masters$/);
   });
 });

@@ -6,11 +6,11 @@ import { collectionOptionLabel } from "@/components/admin/photo-drag";
 
 export function AddPhotograph({
   collections,
-  disabledReason,
+  mastersArchiveLabel,
   onUploaded,
 }: {
   collections: CuratorCollection[];
-  disabledReason: string | null;
+  mastersArchiveLabel: string;
   onUploaded: (payload: unknown) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -23,7 +23,6 @@ export function AddPhotograph({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const needsSetup = Boolean(disabledReason);
   const collection = useMemo(
     () => collections.find((item) => item.id === collectionId),
     [collectionId, collections],
@@ -50,7 +49,7 @@ export function AddPhotograph({
   };
 
   const submit = async () => {
-    if (!file || needsSetup) return;
+    if (!file) return;
     setBusy(true);
     setError(null);
     const body = new FormData();
@@ -100,103 +99,85 @@ export function AddPhotograph({
           />
           <aside className="curator-drawer" role="dialog" aria-labelledby="add-photo-title">
             <h2 id="add-photo-title">Add Photograph</h2>
-            {needsSetup ? (
-              <div>
-                <p className="curator-drawer-help">
-                  Master folder needs setup before new photographs can be added.
-                  Camera originals stay outside Git.
-                </p>
-                <pre className="curator-help-code">{disabledReason}</pre>
-                <div className="curator-drawer-actions">
-                  <button
-                    type="button"
-                    className="curator-btn"
-                    onClick={() => setOpen(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label className="curator-field">
-                  <span>Image</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/tiff,.jpg,.jpeg,.png,.webp,.tif,.tiff"
-                    onChange={(event) => onFile(event.target.files?.[0] ?? null)}
-                  />
-                </label>
-                {preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={preview}
-                    alt="Selected photograph preview"
-                    className="curator-drawer-preview"
-                  />
-                ) : null}
-                <label className="curator-field">
-                  <span>Title</span>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                  />
-                </label>
-                <label className="curator-field">
-                  <span>Collection</span>
-                  <select
-                    value={collectionId}
-                    onChange={(event) => setCollectionId(event.target.value)}
-                  >
-                    {collections.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {collectionOptionLabel(item.site, item.title)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="curator-field">
-                  <span>
-                    Position (0 = first, blank = end
-                    {collection ? `, ${collection.photoIds.length} current` : ""})
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={position}
-                    onChange={(event) => setPosition(event.target.value)}
-                  />
-                </label>
-                <label className="curator-field">
-                  <span>displayScale (optional)</span>
-                  <input
-                    type="text"
-                    value={displayScale}
-                    placeholder="1"
-                    onChange={(event) => setDisplayScale(event.target.value)}
-                  />
-                </label>
-                {error ? <p className="curator-error">{error}</p> : null}
-                <div className="curator-drawer-actions">
-                  <button
-                    type="button"
-                    className="curator-btn curator-btn-quiet"
-                    onClick={() => setOpen(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!file || !title || busy}
-                    className="curator-btn curator-btn-primary"
-                    onClick={() => void submit()}
-                  >
-                    {busy ? "Adding…" : "Add to catalogue"}
-                  </button>
-                </div>
-              </div>
-            )}
+            <p className="curator-drawer-help">
+              Originals are safely copied to {mastersArchiveLabel}.
+            </p>
+            <label className="curator-field">
+              <span>Image</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/tiff,.jpg,.jpeg,.png,.webp,.tif,.tiff"
+                onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview}
+                alt="Selected photograph preview"
+                className="curator-drawer-preview"
+              />
+            ) : null}
+            <label className="curator-field">
+              <span>Title</span>
+              <input
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+            <label className="curator-field">
+              <span>Collection</span>
+              <select
+                value={collectionId}
+                onChange={(event) => setCollectionId(event.target.value)}
+              >
+                {collections.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {collectionOptionLabel(item.site, item.title)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="curator-field">
+              <span>
+                Position (0 = first, blank = end
+                {collection ? `, ${collection.photoIds.length} current` : ""})
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={position}
+                onChange={(event) => setPosition(event.target.value)}
+              />
+            </label>
+            <label className="curator-field">
+              <span>displayScale (optional)</span>
+              <input
+                type="text"
+                value={displayScale}
+                placeholder="1"
+                onChange={(event) => setDisplayScale(event.target.value)}
+              />
+            </label>
+            {error ? <p className="curator-error">{error}</p> : null}
+            <div className="curator-drawer-actions">
+              <button
+                type="button"
+                className="curator-btn curator-btn-quiet"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!file || !title || busy}
+                className="curator-btn curator-btn-primary"
+                onClick={() => void submit()}
+              >
+                {busy ? "Adding…" : "Add to catalogue"}
+              </button>
+            </div>
           </aside>
         </>
       ) : null}

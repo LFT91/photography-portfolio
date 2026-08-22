@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { readCatalogFromDisk, writeCatalogFiles } from "@/lib/admin/catalog-writer";
 import { unassignedIds } from "@/lib/admin/draft";
 import { assertLocalCuratorRequest } from "@/lib/admin/guard";
-import { getMastersStatus } from "@/lib/admin/masters";
+import {
+  DEFAULT_MASTERS_LABEL,
+  displayMastersPath,
+  getMastersStatus,
+} from "@/lib/admin/masters";
 import { validateCatalog, type CatalogIssue } from "@/lib/admin/validate";
 import type { CatalogDraft } from "@/lib/admin/types";
 
@@ -21,8 +25,9 @@ export function curatorPayload(draft?: CatalogDraft) {
     photos: current.photos,
     collections: current.collections,
     unassignedIds: unassignedIds(current.photos, current.collections),
-    canUpload: masters.ok,
-    uploadDisabledReason: masters.ok ? null : masters.reason,
+    mastersArchiveLabel: masters.ok
+      ? displayMastersPath(masters.dir)
+      : DEFAULT_MASTERS_LABEL,
   };
 }
 

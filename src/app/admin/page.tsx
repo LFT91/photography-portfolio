@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { CuratorApp } from "@/components/admin/CuratorApp";
 import { unassignedIds } from "@/lib/admin/draft";
 import { isLocalCuratorEnabled } from "@/lib/admin/guard";
-import { getMastersStatus } from "@/lib/admin/masters";
+import {
+  DEFAULT_MASTERS_LABEL,
+  displayMastersPath,
+  getMastersStatus,
+} from "@/lib/admin/masters";
 import { collectionsToCurator, photosToCurator } from "@/lib/admin/shape";
 import { collections } from "@/content/collections";
 import { photos } from "@/content/photos";
@@ -26,8 +30,9 @@ export default function AdminPage() {
         photos: curatorPhotos,
         collections: curatorCollections,
         unassignedIds: unassignedIds(curatorPhotos, curatorCollections),
-        canUpload: masters.ok,
-        uploadDisabledReason: masters.ok ? null : masters.reason,
+        mastersArchiveLabel: masters.ok
+          ? displayMastersPath(masters.dir)
+          : DEFAULT_MASTERS_LABEL,
       }}
     />
   );

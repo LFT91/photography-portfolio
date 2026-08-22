@@ -46,7 +46,7 @@ npm run curate
 
 That starts the development server on `127.0.0.1` and enables `/admin`. Ordinary `npm run dev` and production builds do not. Save writes `src/content/photos.ts` and `src/content/collections.ts` only — it never pushes to GitHub. Double-click `Photography Curator.command` to do the same from Finder; `Stop Photography Curator.command` stops only that local curator.
 
-Add Photograph needs `MASTERS_DIR` in `.env.local` pointing at an existing folder **outside Git**. Originals are copied there; web derivatives use the same generator as `npm run images`.
+Add Photograph copies the original to `~/Pictures/Fatni Photography Masters` (outside Git) and generates the same web derivatives as `npm run images`. `MASTERS_DIR` is an optional override.
 
 ```bash
 npm run lint

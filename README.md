@@ -44,7 +44,7 @@ Local curation (not available in production):
 npm run curate
 ```
 
-That starts the development server on `127.0.0.1` and enables `/admin`. Ordinary `npm run dev` and production builds do not. Save writes `src/content/photos.ts` and `src/content/collections.ts` only — it never pushes to GitHub.
+That starts the development server on `127.0.0.1` and enables `/admin`. Ordinary `npm run dev` and production builds do not. Save writes `src/content/photos.ts` and `src/content/collections.ts` only — it never pushes to GitHub. Double-click `Photography Curator.command` to do the same from Finder; `Stop Photography Curator.command` stops only that local curator.
 
 Add Photograph needs `MASTERS_DIR` in `.env.local` pointing at an existing folder **outside Git**. Originals are copied there; web derivatives use the same generator as `npm run images`.
 
@@ -54,6 +54,14 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Daily use
+
+1. Double-click `Photography Curator.command`
+2. Curate visually in the browser
+3. Save
+4. Ready to publish
+5. Commit/push when ready
 
 ## Photography workflow
 

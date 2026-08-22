@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { collections } from "../../content/collections";
 import { photos } from "../../content/photos";
-import { getCollectionPhotos, getFatniCollectionSummaries } from "../catalog";
+import { getCollectionPhotos, getFatniCollectionSummaries, unassignedPhotoIds } from "../catalog";
 
 const ROOT = process.cwd();
 
@@ -93,7 +93,7 @@ describe("catalogue integrity", () => {
   it("has one metadata record per photograph and no duplicate IDs", () => {
     const ids = Object.keys(photos);
     assert.equal(ids.length, new Set(ids).size);
-    assert.equal(ids.length, 188);
+    assert.equal(ids.length, 194);
   });
 
   it("references only known photograph IDs", () => {
@@ -112,9 +112,17 @@ describe("catalogue integrity", () => {
     for (const id of used) {
       assert.equal(known.has(id), true, `unknown id ${id}`);
     }
-    for (const id of known) {
-      assert.equal(used.includes(id), true, `unused id ${id}`);
-    }
+  });
+
+  it("keeps the recovered unassigned library out of public collections", () => {
+    assert.deepEqual(unassignedPhotoIds().sort(), [
+      "coastal-moon",
+      "hillside-lights",
+      "star-road",
+      "steel-wool-stars",
+      "sunburst-walk",
+      "sunset-shore",
+    ]);
   });
 
   it("keeps the live production collection sizes", () => {

@@ -12,7 +12,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-concurrency=1 src/lib/__tests__/*.test.ts",
-    "images": "node scripts/generate-images.mjs"
+    "images": "node scripts/generate-images.mjs",
+    "curate": "CURATOR=1 next dev -H 127.0.0.1"
   },
   "dependencies": {
     "next": "16.3.0",

@@ -786,7 +786,32 @@ export const photos = {
     title: "Night Patrol",
     src: "/images/after-dark/night-patrol.jpg",
   },
+  "coastal-moon": {
+    title: "Coastal Moon",
+    src: "/images/nature/coastal-moon.jpg",
+  },
+  "hillside-lights": {
+    title: "Hillside Lights",
+    src: "/images/nature/hillside-lights.jpg",
+    displayScale: 0.83,
+  },
+  "sunset-shore": {
+    title: "Sunset Shore",
+    src: "/images/travel/sunset-shore.jpg",
+  },
+  "star-road": {
+    title: "Star Road",
+    src: "/images/after-dark/650CD8F4-159E-4E17-BF66-985E8DD1F47E.jpg",
+    displayScale: 0.78,
+  },
+  "steel-wool-stars": {
+    title: "Steel Wool Stars",
+    src: "/images/after-dark/FIRE50edit.jpg",
+  },
+  "sunburst-walk": {
+    title: "Sunburst Walk",
+    src: "/images/street/sunburst-walk.jpg",
+  },
 } as const satisfies Record<PhotoId, PhotoRecord>;
 
 export type CatalogPhotoId = keyof typeof photos;
-
